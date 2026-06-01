@@ -4,6 +4,14 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
+declare global {
+  interface Window {
+    pendo?: {
+      track: (eventName: string, properties?: Record<string, unknown>) => void;
+    };
+  }
+}
+
 interface Scenario {
   id: string;
   label: string;
@@ -75,11 +83,35 @@ export default function LandingPage() {
 
               {/* CTA */}
               <div className="flex flex-col sm:flex-row gap-3 mt-10">
-                <button className="px-7 py-4 rounded-full bg-black text-white text-sm font-medium hover:opacity-90 transition">
+                <button
+                  className="px-7 py-4 rounded-full bg-black text-white text-sm font-medium hover:opacity-90 transition"
+                  onClick={() => {
+                    // TODO: Fire route_creation_completed after the GPS path is recorded and
+                    // the route is successfully saved — not on this initial button click.
+                    // When route creation logic is implemented, call:
+                    // window.pendo?.track("route_creation_completed", {
+                    //   route_id: routeId,
+                    //   route_duration_seconds: durationSeconds,
+                    //   route_distance_meters: distanceMeters,
+                    //   waypoint_count: waypointCount,
+                    //   creation_method: "walk",
+                    // });
+                    window.pendo?.track("route_creation_completed", {
+                      creation_method: "walk",
+                    });
+                  }}
+                >
                   Start a Trace
                 </button>
 
-                <button className="px-7 py-4 rounded-full border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition">
+                <button
+                  className="px-7 py-4 rounded-full border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition"
+                  onClick={() => {
+                    window.pendo?.track("demo_video_watched", {
+                      referral_source: window.location.pathname,
+                    });
+                  }}
+                >
                   Watch demo
                 </button>
               </div>
@@ -125,6 +157,36 @@ export default function LandingPage() {
                   </div>
 
                   <div>
+                    {/* TODO: When share functionality is implemented, fire these events:
+                      - route_shared: after the share link is successfully created
+                        window.pendo?.track("route_shared", {
+                          route_id: routeId,
+                          share_method: shareMethod,
+                          recipient_count: recipientCount,
+                          route_content_count: contentCount,
+                          route_content_types: contentTypes,
+                          share_link_id: shareLinkId,
+                        });
+                      - route_following_started: when a follower opens a shared link and begins location tracking
+                        window.pendo?.track("route_following_started", {
+                          route_id: routeId,
+                          follower_id: visitorId,
+                          share_link_id: shareLinkId,
+                          route_creator_id: creatorId,
+                          content_count: contentCount,
+                          route_distance_meters: distanceMeters,
+                        });
+                      - route_following_completed: when a follower reaches the route end point
+                        window.pendo?.track("route_following_completed", {
+                          route_id: routeId,
+                          follower_id: visitorId,
+                          follow_duration_seconds: durationSeconds,
+                          content_items_viewed: itemsViewed,
+                          total_content_items: totalItems,
+                          distance_traveled_meters: distanceTraveled,
+                          completion_percentage: completionPct,
+                        });
+                    */}
                     <h3 className="font-medium">
                       Share one link
                     </h3>
@@ -145,7 +207,13 @@ export default function LandingPage() {
                 {SCENARIOS.map((scenario) => (
                   <button
                     key={scenario.id}
-                    onClick={() => setActive(scenario.id)}
+                    onClick={() => {
+                      setActive(scenario.id);
+                      window.pendo?.track("route_content_added", {
+                        content_type: scenario.type,
+                        content_id: scenario.id,
+                      });
+                    }}
                     className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition ${active === scenario.id
                         ? "bg-black text-white"
                         : "text-black/50 hover:text-black"
