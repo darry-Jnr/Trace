@@ -25,6 +25,13 @@ export default function RootLayout({
     z=e.getElementsByTagName(n)[0];z.parentNode.insertBefore(y,z);})(window,document,'script','pendo');
 })('79b4ac85-fc1f-4697-8874-a3605978de4a');
         `}</Script>
+        <Script id="pendo-init" strategy="beforeInteractive">{`
+pendo.initialize({
+  visitor: {
+    id: ''
+  }
+});
+        `}</Script>
       </head>
       <body>
         {children}
