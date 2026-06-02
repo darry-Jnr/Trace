@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -75,9 +76,9 @@ export default function LandingPage() {
 
               {/* CTA */}
               <div className="flex flex-col sm:flex-row gap-3 mt-10">
-                <button className="px-7 py-4 rounded-full bg-black text-white text-sm font-medium hover:opacity-90 transition">
+                <Link href="/dashboard" className="px-7 py-4 rounded-full bg-black text-white text-sm font-medium hover:opacity-90 transition text-center">
                   Start a Trace
-                </button>
+                </Link>
 
                 <button className="px-7 py-4 rounded-full border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition">
                   Watch demo
