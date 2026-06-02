@@ -15,6 +15,7 @@ import { useTraceRecording } from "./hooks/useTraceRecording";
 
 export default function DashboardPage() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [zoomPercent, setZoomPercent] = useState(100);
 
     const {
         userLocation,
@@ -30,13 +31,9 @@ export default function DashboardPage() {
 
     return (
         <div className="h-screen w-screen overflow-hidden bg-white flex flex-col font-sans">
-            {/* Pre-load Leaflet CSS during loading state to prevent layout flashes */}
-            <link
-                rel="stylesheet"
-                href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-            />
 
-            <Navbar userLocation={userLocation} />
+
+            <Navbar userLocation={userLocation} zoomPercent={zoomPercent} />
 
             <div className="flex-1 flex overflow-hidden relative">
                 {/* desktop sidebar */}
@@ -84,6 +81,14 @@ export default function DashboardPage() {
                     <TraceMap
                         userLocation={userLocation}
                         tracePath={tracePath}
+                        onZoomChange={(zoom) => {
+                            // Map zoom [14, 19.5] to [0%, 100%]
+                            const percent = Math.min(
+                                100,
+                                Math.max(0, Math.round(((zoom - 14) / (19.5 - 14)) * 100))
+                            );
+                            setZoomPercent(percent);
+                        }}
                     />
 
                     <LocationLoader
