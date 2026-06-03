@@ -401,54 +401,62 @@ export default function Dashboard() {
             )}
 
             {/* VIEW TOGGLE */}
-            {!isLoading && userLocation && (
-                <button
-                    onClick={toggleView}
-                    className="
-                        absolute
-                        bottom-8
-                        left-1/2
-                        -translate-x-1/2
-                        z-40
-                        h-14
-                        px-5
-                        rounded-2xl
-                        bg-white/90
-                        backdrop-blur-xl
-                        border
-                        border-black/[0.06]
-                        shadow-[0_10px_40px_rgba(0,0,0,0.08)]
-                        flex
-                        items-center
-                        gap-3
-                        active:scale-[0.98]
-                        transition-all
-                    "
-                >
-                    <div className="w-9 h-9 rounded-xl bg-[#0052FF]/10 flex items-center justify-center">
-                        {viewMode ===
-                        "flat" ? (
-                            <Mountain className="w-4 h-4 text-[#0052FF]" />
-                        ) : (
-                            <Map className="w-4 h-4 text-[#0052FF]" />
-                        )}
-                    </div>
+{!isLoading && userLocation && (
+    <button
+        onClick={toggleView}
+        className="
+            absolute
+            left-1/2
+            -translate-x-1/2
+            z-40
 
-                    <div className="flex flex-col items-start">
-                        <span className="text-[10px] font-medium text-black/40 uppercase tracking-wider">
-                            View
-                        </span>
+            bottom-[max(1.5rem,env(safe-area-inset-bottom))]
+            sm:bottom-8
 
-                        <span className="text-sm font-semibold tracking-tight text-black">
-                            {viewMode ===
-                            "flat"
-                                ? "Tilted"
-                                : "Flat"}{" "}
-                            Mode
-                        </span>
-                    </div>
-                </button>
+            h-14
+            px-5
+
+            rounded-2xl
+            bg-white/92
+            backdrop-blur-2xl
+
+            border
+            border-black/[0.06]
+
+            shadow-[0_10px_40px_rgba(0,0,0,0.08)]
+
+            flex
+            items-center
+            gap-3
+
+            whitespace-nowrap
+
+            active:scale-[0.98]
+            transition-all
+        "
+    >
+        <div className="w-9 h-9 rounded-xl bg-[#0052FF]/10 flex items-center justify-center shrink-0">
+            {viewMode === "flat" ? (
+                <Mountain className="w-4 h-4 text-[#0052FF]" />
+            ) : (
+                <Map className="w-4 h-4 text-[#0052FF]" />
             )}
+        </div>
+
+        <div className="flex flex-col items-start leading-none">
+            <span className="text-[10px] font-medium text-black/35 uppercase tracking-wider">
+                View
+            </span>
+
+            <span className="mt-1 text-sm font-semibold tracking-tight text-black">
+                {viewMode === "flat"
+                    ? "Tilted"
+                    : "Flat"}{" "}
+                Mode
+            </span>
+        </div>
+    </button>
+)}
 
             {/* LOADING */}
             {isLoading && (
