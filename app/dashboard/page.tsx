@@ -4,12 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import {
   Navigation,
-  LocateFixed,
   LoaderCircle,
   Map,
   Mountain,
   Radar,
-  RefreshCcw,
   ArrowUp,
   CirclePlay,
   OctagonAlert,
@@ -45,6 +43,10 @@ export default function Dashboard() {
 
   // Track live trail coordinate array using a mutable ref to handle instant GPS ticks
   const pathCoordsRef = useRef<[number, number][]>([]);
+  
+  // CRITICAL: Refs to prevent stale closures inside the permanent geolocation loop
+  const isRecordingRef = useRef(false);
+  const userLocationRef = useRef<[number, number] | null>(null);
 
   // ==================================================
   // STATE
@@ -62,6 +64,15 @@ export default function Dashboard() {
   const [mediaModal, setMediaModal] = useState<MediaModalType>(null);
   const [mediaInputText, setMediaInputText] = useState("");
   const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
+
+  // Keep refs perfectly synchronized with active states
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+  }, [userLocation]);
 
   // ==================================================
   // INITIAL BOOT DECK (CACHE DETECTOR)
@@ -200,13 +211,6 @@ export default function Dashboard() {
           </div>
         `;
 
-        // Direct action invocation on clicking the embedded custom arrow marker
-        markerContainer.addEventListener("click", (event) => {
-          event.stopPropagation();
-          // Toggle tracking loop state
-          setIsRecording((prev) => !prev);
-        });
-
         const junctionMarker = new mapboxgl.Marker({
           element: markerContainer,
           draggable: true,
@@ -232,7 +236,6 @@ export default function Dashboard() {
   // ==================================================
   useEffect(() => {
     if (isRecording && userLocation) {
-      // Initialize path array with current location coordinates
       pathCoordsRef.current = [userLocation];
       updateMapTrailSource();
     }
@@ -283,15 +286,15 @@ export default function Dashboard() {
         setUserLocation((prevUserLocation) => {
           const locationChanged =
             !prevUserLocation ||
-            Math.abs(prevUserLocation[0] - coords[0]) > 0.0001 ||
-            Math.abs(prevUserLocation[1] - coords[1]) > 0.0001;
+            Math.abs(prevUserLocation[0] - coords[0]) > 0.00005 ||
+            Math.abs(prevUserLocation[1] - coords[1]) > 0.00005;
 
           if (locationChanged && mapInstanceRef.current) {
             if (prevUserLocation) {
               mapInstanceRef.current.easeTo({
                 center: coords,
                 zoom: 17,
-                duration: 1500,
+                duration: 1200,
               });
             } else {
               mapInstanceRef.current.flyTo({
@@ -301,15 +304,15 @@ export default function Dashboard() {
                 essential: true,
               });
             }
-
-            // Append tracking path vectors if recording mode is active
-            if (isRecording) {
-              pathCoordsRef.current = [...pathCoordsRef.current, coords];
-              updateMapTrailSource();
-            }
           }
           return coords;
         });
+
+        // Fixed Closure Loop: Dynamically appends trail vectors based on safe mutable flags
+        if (isRecordingRef.current) {
+          pathCoordsRef.current = [...pathCoordsRef.current, coords];
+          updateMapTrailSource();
+        }
 
         if (userMarkerRef.current) {
           userMarkerRef.current.setLngLat(coords);
@@ -343,7 +346,7 @@ export default function Dashboard() {
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, [isRecording]);
+  }, []); // Empty dependency array keeps geolocation running cleanly in background
 
   // ==================================================
   // ACTION DISPATCHERS
@@ -366,27 +369,29 @@ export default function Dashboard() {
   };
 
   const handleSaveMediaMarker = () => {
-    if (!userLocation || !mapInstanceRef.current) return;
+    // Read directly from ref to avoid modal state delays
+    const placementCoords = userLocationRef.current;
+    if (!placementCoords || !mapInstanceRef.current) return;
 
     const newMedia: WaypointMedia = {
       type: mediaModal!,
-      content: mediaModal === "text" ? mediaInputText : `Sample metadata placeholder link tracking assets`,
-      coordinates: userLocation,
+      content: mediaModal === "text" ? mediaInputText : `Hardware attached ${mediaModal} capture data`,
+      coordinates: placementCoords,
     };
 
     setSavedMedia((prev) => [...prev, newMedia]);
 
-    // Instantiate custom pin node marker onto the live trail map
+    // Instantiate customized asset pin node directly on the live line trail path
     const customMediaEl = document.createElement("div");
-    customMediaEl.className = "w-8 h-8 rounded-full bg-black text-white border-2 border-white shadow-lg flex items-center justify-center font-bold text-xs cursor-pointer";
+    customMediaEl.className = "w-8 h-8 rounded-full bg-black text-white border-2 border-white shadow-lg flex items-center justify-center font-bold text-[10px] cursor-pointer transform transition-transform active:scale-95";
     customMediaEl.innerHTML = mediaModal === "text" ? "Txt" : mediaModal === "image" ? "Img" : "Voc";
 
     new mapboxgl.Marker({ element: customMediaEl })
-      .setLngLat(userLocation)
-      .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<p class="p-2 text-sm text-black font-medium">${newMedia.content}</p>`))
+      .setLngLat(placementCoords)
+      .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<p class="p-2 text-xs text-black font-semibold">${newMedia.content}</p>`))
       .addTo(mapInstanceRef.current);
 
-    // Clear and reset modal parameters
+    // Clear and reset modal configurations
     setMediaInputText("");
     setMediaModal(null);
   };
