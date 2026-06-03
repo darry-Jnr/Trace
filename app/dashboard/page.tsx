@@ -10,6 +10,8 @@ type LoadingStage =
   | "improving"
   | "done";
 
+type ViewMode = "flat" | "tilted";
+
 export default function Dashboard() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
@@ -21,6 +23,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [loadingStage, setLoadingStage] = useState<LoadingStage>("booting");
+  const [viewMode, setViewMode] = useState<ViewMode>("flat");
 
   // STEP 1: Fast IP boot
   useEffect(() => {
@@ -51,6 +54,8 @@ export default function Dashboard() {
       style: "mapbox://styles/mapbox/streets-v12",
       center: baseLocation,
       zoom: 14,
+      pitch: 0,
+      bearing: 0,
     });
 
     const marker = new mapboxgl.Marker({ color: "#0052FF" })
@@ -118,7 +123,6 @@ export default function Dashboard() {
       },
     });
 
-    // shrink circle as accuracy improves
     const radius = Math.min(accuracy / 2, 80);
     map.setPaintProperty(
       "accuracy-circle-layer",
@@ -144,7 +148,6 @@ export default function Dashboard() {
         ];
         const accuracy = position.coords.accuracy;
 
-        // move marker and camera on every update
         if (mapInstanceRef.current) {
           mapInstanceRef.current.flyTo({
             center: coords,
@@ -160,12 +163,10 @@ export default function Dashboard() {
         updateAccuracyCircle(coords, accuracy);
 
         if (accuracy > 100) {
-          // still refining
           setLoadingStage("improving");
           setUserLocation(coords);
           setIsLoading(false);
         } else {
-          // accurate enough, stop watching
           setLoadingStage("done");
           setUserLocation(coords);
           setIsLoading(false);
@@ -202,6 +203,20 @@ export default function Dashboard() {
     improving: "Improving accuracy...",
     done: "Location found",
   }[loadingStage];
+
+  // toggle between flat and tilted view
+  const toggleView = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (viewMode === "flat") {
+      map.easeTo({ pitch: 60, bearing: 0, duration: 800 });
+      setViewMode("tilted");
+    } else {
+      map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+      setViewMode("flat");
+    }
+  };
 
   // retry handler
   const retryLocation = () => {
@@ -254,6 +269,16 @@ export default function Dashboard() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#f5f5f7]">
       <div ref={mapRef} className="w-full h-full" />
+
+      {/* view toggle button */}
+      {!isLoading && userLocation && (
+        <button
+          onClick={toggleView}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 bg-white border border-black/10 shadow-lg px-5 py-3 rounded-2xl text-sm font-semibold text-black active:scale-[0.97] transition"
+        >
+          {viewMode === "flat" ? "🗺️ Tilted View" : "🗺️ Flat View"}
+        </button>
+      )}
 
       {/* loading overlay */}
       {isLoading && (
