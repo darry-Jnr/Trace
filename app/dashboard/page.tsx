@@ -31,26 +31,31 @@ interface WaypointMedia {
 
 const CACHE_KEY = "trace_last_known_location";
 
+const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
+  const R = 6371000;
+  const dLat = ((coord2[1] - coord1[1]) * Math.PI) / 180;
+  const dLng = ((coord2[0] - coord1[0]) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((coord1[1] * Math.PI) / 180) *
+    Math.cos((coord2[1] * Math.PI) / 180) *
+    Math.sin(dLng / 2) *
+    Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 export default function Dashboard() {
-  // ==================================================
-  // REFS
-  // ==================================================
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const junctionMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
-  // Track live trail coordinate array using a mutable ref to handle instant GPS ticks
   const pathCoordsRef = useRef<[number, number][]>([]);
-  
-  // CRITICAL: Refs to prevent stale closures inside the permanent geolocation loop
   const isRecordingRef = useRef(false);
   const userLocationRef = useRef<[number, number] | null>(null);
 
-  // ==================================================
-  // STATE
-  // ==================================================
   const [baseLocation, setBaseLocation] = useState<[number, number] | null>(null);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,13 +64,11 @@ export default function Dashboard() {
   const [isPlacementMode, setIsPlacementMode] = useState(false);
   const [turnAngle, setTurnAngle] = useState<number>(0);
 
-  // Path Tracking states
   const [isRecording, setIsRecording] = useState(false);
   const [mediaModal, setMediaModal] = useState<MediaModalType>(null);
   const [mediaInputText, setMediaInputText] = useState("");
   const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
 
-  // Keep refs perfectly synchronized with active states
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
@@ -74,9 +77,7 @@ export default function Dashboard() {
     userLocationRef.current = userLocation;
   }, [userLocation]);
 
-  // ==================================================
-  // INITIAL BOOT DECK (CACHE DETECTOR)
-  // ==================================================
+  // 1. BOOTSTRAP INITIAL COORDINATES SAFELY
   useEffect(() => {
     async function prepareMap() {
       try {
@@ -99,7 +100,7 @@ export default function Dashboard() {
         if (data.longitude && data.latitude) {
           setBaseLocation([data.longitude, data.latitude]);
         } else {
-          setBaseLocation([3.3792, 6.5244]); // Lagos fallback
+          setBaseLocation([3.3792, 6.5244]);
         }
       } catch {
         setBaseLocation([3.3792, 6.5244]);
@@ -108,18 +109,13 @@ export default function Dashboard() {
     prepareMap();
   }, []);
 
-  // ==================================================
-  // UPDATE JUNCTION ARROW ORIENTATION TRANSFORMS
-  // ==================================================
   useEffect(() => {
     const markerElement = document.getElementById("junction-arrow-element");
     if (!markerElement) return;
     markerElement.style.transform = `rotate(${turnAngle}deg)`;
   }, [turnAngle]);
 
-  // ==================================================
-  // INITIALIZE MAPBOX & INDEPENDENT VECTOR SOURCES
-  // ==================================================
+  // 2. LIFECYCLE SAFE MAPBOX INITIALIZATION (PREVENTS WEBGL CONTEXT LOSS)
   useEffect(() => {
     if (!baseLocation || !mapRef.current || mapInstanceRef.current) return;
 
@@ -147,16 +143,12 @@ export default function Dashboard() {
         "horizon-blend": 0.02,
       });
 
-      // Inject runtime transactional line layers
       map.addSource("recording-trail-source", {
         type: "geojson",
         data: {
           type: "Feature",
           properties: {},
-          geometry: {
-            type: "LineString",
-            coordinates: [],
-          },
+          geometry: { type: "LineString", coordinates: [] },
         },
       });
 
@@ -164,22 +156,12 @@ export default function Dashboard() {
         id: "recording-trail-layer",
         type: "line",
         source: "recording-trail-source",
-        layout: {
-          "line-join": "round",
-          "line-cap": "round",
-        },
-        paint: {
-          "line-color": "#0052FF",
-          "line-width": 6,
-          "line-opacity": 0.85,
-        },
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#0052FF", "line-width": 6, "line-opacity": 0.85 },
       });
     });
 
-    const userMarker = new mapboxgl.Marker({
-      color: "#0052FF",
-      scale: 1.1,
-    })
+    const userMarker = new mapboxgl.Marker({ color: "#0052FF", scale: 1.1 })
       .setLngLat(baseLocation)
       .addTo(map);
 
@@ -189,9 +171,7 @@ export default function Dashboard() {
     map.on("click", (e) => {
       const el = mapRef.current;
       if (el && el.getAttribute("data-placement") === "true") {
-        if (junctionMarkerRef.current) {
-          junctionMarkerRef.current.remove();
-        }
+        if (junctionMarkerRef.current) junctionMarkerRef.current.remove();
 
         const markerContainer = document.createElement("div");
         markerContainer.className = "cursor-grab active:cursor-grabbing";
@@ -211,10 +191,7 @@ export default function Dashboard() {
           </div>
         `;
 
-        const junctionMarker = new mapboxgl.Marker({
-          element: markerContainer,
-          draggable: true,
-        })
+        const junctionMarker = new mapboxgl.Marker({ element: markerContainer, draggable: true })
           .setLngLat([e.lngLat.lng, e.lngLat.lat])
           .addTo(map);
 
@@ -224,16 +201,13 @@ export default function Dashboard() {
     });
 
     return () => {
+      if (junctionMarkerRef.current) junctionMarkerRef.current.remove();
+      if (userMarkerRef.current) userMarkerRef.current.remove();
       map.remove();
       mapInstanceRef.current = null;
-      userMarkerRef.current = null;
-      if (junctionMarkerRef.current) junctionMarkerRef.current.remove();
     };
   }, [baseLocation]);
 
-  // ==================================================
-  // LIVE PATH SYNC ON COMPONENT RECORDING STATUS CHANGES
-  // ==================================================
   useEffect(() => {
     if (isRecording && userLocation) {
       pathCoordsRef.current = [userLocation];
@@ -249,17 +223,12 @@ export default function Dashboard() {
       source.setData({
         type: "Feature",
         properties: {},
-        geometry: {
-          type: "LineString",
-          coordinates: pathCoordsRef.current,
-        },
+        geometry: { type: "LineString", coordinates: pathCoordsRef.current },
       });
     }
   };
 
-  // ==================================================
-  // PERMANENT BACKGROUND GEOLOCATION WATCH DECK
-  // ==================================================
+  // 3. SECURE BACKGROUND GEOLOCATION WATCH DECK WITH TIMEOUT SAFETY NETS
   useEffect(() => {
     if (!navigator.geolocation) {
       setIsLoading(false);
@@ -271,72 +240,95 @@ export default function Dashboard() {
       if (localStorage.getItem(CACHE_KEY)) hasCache = true;
     } catch { }
 
-    if (!hasCache) {
-      setLoadingStage("searching");
-    }
+    if (!hasCache) setLoadingStage("searching");
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const coords: [number, number] = [
-          position.coords.longitude,
-          position.coords.latitude,
-        ];
+        let rawLng = position.coords.longitude;
+        let rawLat = position.coords.latitude;
         const accuracy = position.coords.accuracy;
+        const heading = position.coords.heading;
+
+        if (accuracy > 25 && isRecordingRef.current) return;
 
         setUserLocation((prevUserLocation) => {
+          let finalCoords: [number, number] = [rawLng, rawLat];
+
+          if (prevUserLocation) {
+            finalCoords = [
+              prevUserLocation[0] * 0.25 + rawLng * 0.75,
+              prevUserLocation[1] * 0.25 + rawLat * 0.75,
+            ];
+          }
+
           const locationChanged =
             !prevUserLocation ||
-            Math.abs(prevUserLocation[0] - coords[0]) > 0.00005 ||
-            Math.abs(prevUserLocation[1] - coords[1]) > 0.00005;
+            Math.abs(prevUserLocation[0] - finalCoords[0]) > 0.00003 ||
+            Math.abs(prevUserLocation[1] - finalCoords[1]) > 0.00003;
 
           if (locationChanged && mapInstanceRef.current) {
+            // CRITICAL FIX: Only rotate the map to heading if recording is true!
+            // Otherwise, lock target bearing strictly to 0 (clean top-down north view)
+            const targetBearing = (isRecordingRef.current && heading !== null && heading !== undefined)
+              ? heading
+              : 0;
+
             if (prevUserLocation) {
               mapInstanceRef.current.easeTo({
-                center: coords,
+                center: finalCoords,
                 zoom: 17,
-                duration: 1200,
+                bearing: targetBearing,
+                duration: 1100,
               });
             } else {
               mapInstanceRef.current.flyTo({
-                center: coords,
+                center: finalCoords,
                 zoom: 17,
+                bearing: targetBearing,
                 speed: 1.1,
                 essential: true,
               });
             }
           }
-          return coords;
+
+          if (isRecordingRef.current) {
+            const history = pathCoordsRef.current;
+            if (history.length === 0) {
+              pathCoordsRef.current = [finalCoords];
+              updateMapTrailSource();
+            } else {
+              const lastSavedPoint = history[history.length - 1];
+              const distanceMoved = getDistanceMeters(lastSavedPoint, finalCoords);
+
+              if (distanceMoved > 3.5) {
+                pathCoordsRef.current = [...history, finalCoords];
+                updateMapTrailSource();
+              }
+            }
+          }
+
+          return finalCoords;
         });
 
-        // Fixed Closure Loop: Dynamically appends trail vectors based on safe mutable flags
-        if (isRecordingRef.current) {
-          pathCoordsRef.current = [...pathCoordsRef.current, coords];
-          updateMapTrailSource();
-        }
-
-        if (userMarkerRef.current) {
-          userMarkerRef.current.setLngLat(coords);
+        if (userMarkerRef.current && userLocationRef.current) {
+          userMarkerRef.current.setLngLat(userLocationRef.current);
         }
 
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(coords));
+          localStorage.setItem(CACHE_KEY, JSON.stringify([rawLng, rawLat]));
         } catch (e) { }
 
-        if (accuracy > 100) {
-          if (!hasCache) setLoadingStage("improving");
-          setIsLoading(false);
-        } else {
-          setLoadingStage("done");
-          setIsLoading(false);
-        }
+        setLoadingStage("done");
+        setIsLoading(false);
       },
       (error) => {
-        console.log("GPS error:", error);
-        if (!hasCache) setIsLoading(false);
+        console.error("GPS stream alert:", error);
+        // NON-BLOCKING CATCH-ALL: Prevents timeouts on laptops from completely bricking the UI
+        setIsLoading(false);
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 10000, // Safe baseline window
         maximumAge: 0,
       }
     );
@@ -346,17 +338,14 @@ export default function Dashboard() {
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, []); // Empty dependency array keeps geolocation running cleanly in background
+  }, []);
 
-  // ==================================================
-  // ACTION DISPATCHERS
-  // ==================================================
   const toggleView = () => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     if (viewMode === "flat") {
-      map.easeTo({ pitch: 65, bearing: 15, duration: 1200 });
+      map.easeTo({ pitch: 65, bearing: 0, duration: 1200 });
       setViewMode("tilted");
     } else {
       map.easeTo({ pitch: 0, bearing: 0, duration: 1200 });
@@ -369,7 +358,6 @@ export default function Dashboard() {
   };
 
   const handleSaveMediaMarker = () => {
-    // Read directly from ref to avoid modal state delays
     const placementCoords = userLocationRef.current;
     if (!placementCoords || !mapInstanceRef.current) return;
 
@@ -381,7 +369,6 @@ export default function Dashboard() {
 
     setSavedMedia((prev) => [...prev, newMedia]);
 
-    // Instantiate customized asset pin node directly on the live line trail path
     const customMediaEl = document.createElement("div");
     customMediaEl.className = "w-8 h-8 rounded-full bg-black text-white border-2 border-white shadow-lg flex items-center justify-center font-bold text-[10px] cursor-pointer transform transition-transform active:scale-95";
     customMediaEl.innerHTML = mediaModal === "text" ? "Txt" : mediaModal === "image" ? "Img" : "Voc";
@@ -391,7 +378,6 @@ export default function Dashboard() {
       .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<p class="p-2 text-xs text-black font-semibold">${newMedia.content}</p>`))
       .addTo(mapInstanceRef.current);
 
-    // Clear and reset modal configurations
     setMediaInputText("");
     setMediaModal(null);
   };
@@ -405,20 +391,13 @@ export default function Dashboard() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#f5f5f7]">
-      <div
-        ref={mapRef}
-        data-placement={isPlacementMode}
-        className="w-full h-full"
-      />
+      <div ref={mapRef} data-placement={isPlacementMode} className="w-full h-full" />
 
-      {/* TOP BAR CONNECTIVITY BADGE AND RECORDING ALERTS */}
       {!isLoading && userLocation && (
         <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2">
           <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/90 backdrop-blur-xl border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
             <Radar className="w-4 h-4 text-[#0052FF]" />
-            <p className="text-xs font-semibold tracking-tight text-black/70">
-              GPS Connected
-            </p>
+            <p className="text-xs font-semibold tracking-tight text-black/70">GPS Connected</p>
           </div>
 
           {isRecording && (
@@ -430,21 +409,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* SIDEBAR RIGHT CONTROL HUB */}
       {!isLoading && userLocation && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3">
-
-          {/* CONTROL SWITCH 1: VIEW TRANSITION CONFIGURATION */}
           <button
             onClick={toggleView}
             className="w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl bg-white/92 backdrop-blur-2xl border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)] whitespace-nowrap active:scale-[0.98] transition-all"
           >
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#0052FF]/10 flex items-center justify-center shrink-0">
-              {viewMode === "flat" ? (
-                <Mountain className="w-4 h-4 text-[#0052FF]" />
-              ) : (
-                <Map className="w-4 h-4 text-[#0052FF]" />
-              )}
+              {viewMode === "flat" ? <Mountain className="w-4 h-4 text-[#0052FF]" /> : <Map className="w-4 h-4 text-[#0052FF]" />}
             </div>
             <div className="flex flex-col items-center sm:items-start leading-none">
               <span className="text-[8px] sm:text-[10px] font-medium text-black/35 uppercase tracking-wider">View</span>
@@ -452,14 +424,12 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* CONTROL SWITCH 2: PLACE JUNCTION INDICATOR */}
           <button
             onClick={() => setIsPlacementMode(!isPlacementMode)}
             className={`w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl border shadow-[0_10px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl whitespace-nowrap active:scale-[0.98] transition-all ${isPlacementMode ? "bg-[#0052FF] border-[#0052FF] text-white" : "bg-white/92 border-black/[0.06] text-black"
               }`}
           >
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 ${isPlacementMode ? "bg-white/20" : "bg-[#0052FF]/10"
-              }`}>
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 ${isPlacementMode ? "bg-white/20" : "bg-[#0052FF]/10"}`}>
               <Navigation className={`w-4 h-4 ${isPlacementMode ? "text-white" : "text-[#0052FF]"}`} />
             </div>
             <div className="flex flex-col items-center sm:items-start leading-none">
@@ -468,7 +438,6 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* CONTROL SWITCH 3: ROTATE JUNCTION ARROW BUTTON */}
           {junctionMarkerRef.current && (
             <button
               onClick={stepClockRotation}
@@ -484,7 +453,6 @@ export default function Dashboard() {
             </button>
           )}
 
-          {/* DYNAMIC RECORDING SYSTEM TRIGGER CONTROLLERS */}
           {junctionMarkerRef.current && (
             <button
               onClick={() => setIsRecording(!isRecording)}
@@ -501,43 +469,35 @@ export default function Dashboard() {
             </button>
           )}
 
-          {/* SIDEBAR MEDIA INJECTION DECK PANEL (LOCKS OUTSIDE RECORDING WINDOWS) */}
           {isRecording && (
             <div className="mt-4 p-2 bg-black/90 backdrop-blur-2xl rounded-2xl border border-white/10 flex flex-col gap-2 items-center shadow-2xl">
               <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 pb-1 border-b border-white/10 w-full text-center">Add</span>
-
               <button onClick={() => setMediaModal("text")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
                 <Type className="w-4 h-4" />
               </button>
-
               <button onClick={() => setMediaModal("image")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
                 <ImageIcon className="w-4 h-4" />
               </button>
-
               <button onClick={() => setMediaModal("voice")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
                 <Mic className="w-4 h-4" />
               </button>
             </div>
           )}
-
         </div>
       )}
 
-      {/* MODAL HUD ENGINES FOR MEDIA FEEDBACK */}
       {mediaModal && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[28px] border border-black/[0.06] shadow-2xl p-6 w-full max-w-sm relative">
             <button onClick={() => setMediaModal(null)} className="absolute top-4 right-4 text-black/40 hover:text-black">
               <X className="w-5 h-5" />
             </button>
-
             <h3 className="text-base font-bold tracking-tight text-black capitalize mb-4 flex items-center gap-2">
               {mediaModal === "text" && <Type className="w-5 h-5 text-[#0052FF]" />}
               {mediaModal === "image" && <ImageIcon className="w-5 h-5 text-[#0052FF]" />}
               {mediaModal === "voice" && <Mic className="w-5 h-5 text-[#0052FF]" />}
               Attach {mediaModal} Waypoint
             </h3>
-
             {mediaModal === "text" ? (
               <textarea
                 value={mediaInputText}
@@ -551,18 +511,13 @@ export default function Dashboard() {
                 <p className="text-[11px] text-black/40 mt-1">Ready for hardware stream pipeline injection</p>
               </div>
             )}
-
-            <button
-              onClick={handleSaveMediaMarker}
-              className="mt-4 w-full h-11 rounded-xl bg-[#0052FF] hover:bg-[#003ECC] text-white text-sm font-semibold transition-all"
-            >
+            <button onClick={handleSaveMediaMarker} className="mt-4 w-full h-11 rounded-xl bg-[#0052FF] hover:bg-[#003ECC] text-white text-sm font-semibold transition-all">
               Pin onto Line Trail
             </button>
           </div>
         </div>
       )}
 
-      {/* APPLE ECOSYSTEM COMPONENT ANIMATED LOADING BLOCK HOOD */}
       {isLoading && (
         <div className="absolute inset-0 z-50 bg-[#f5f5f7]/80 backdrop-blur-xl flex items-center justify-center">
           <div className="flex flex-col items-center gap-5">
@@ -576,21 +531,6 @@ export default function Dashboard() {
               <h2 className="text-[15px] font-semibold tracking-tight text-black">{loadingMessage}</h2>
               <p className="mt-1 text-sm text-black/45">Syncing navigation environment</p>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* RUNTIME ERROR POPUPS */}
-      {!isLoading && !userLocation && (
-        <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-xl flex items-center justify-center p-6">
-          <div className="w-full max-w-[360px] rounded-[32px] bg-white border border-black/[0.06] shadow-[0_30px_80px_rgba(0,0,0,0.12)] p-6">
-            <div className="w-14 h-14 rounded-2xl bg-[#0052FF]/10 flex items-center justify-center">
-              <Navigation className="w-6 h-6 text-[#0052FF]" />
-            </div>
-            <h2 className="mt-5 text-xl font-bold tracking-tight text-black">Location unavailable</h2>
-            <p className="mt-2 text-sm leading-relaxed text-black/55">
-              Trace could not access your GPS location. Please allow location permissions and try again.
-            </p>
           </div>
         </div>
       )}
