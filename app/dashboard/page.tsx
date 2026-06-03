@@ -11,12 +11,25 @@ import {
   Radar,
   RefreshCcw,
   ArrowUp,
+  CirclePlay,
+  OctagonAlert,
+  Mic,
+  Image as ImageIcon,
+  Type,
+  X
 } from "lucide-react";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
 type LoadingStage = "booting" | "searching" | "improving" | "done";
 type ViewMode = "flat" | "tilted";
+type MediaModalType = "text" | "image" | "voice" | null;
+
+interface WaypointMedia {
+  type: "text" | "image" | "voice";
+  content: string;
+  coordinates: [number, number];
+}
 
 const CACHE_KEY = "trace_last_known_location";
 
@@ -30,6 +43,9 @@ export default function Dashboard() {
   const junctionMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
+  // Track live trail coordinate array using a mutable ref to handle instant GPS ticks
+  const pathCoordsRef = useRef<[number, number][]>([]);
+
   // ==================================================
   // STATE
   // ==================================================
@@ -39,9 +55,13 @@ export default function Dashboard() {
   const [loadingStage, setLoadingStage] = useState<LoadingStage>("booting");
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
   const [isPlacementMode, setIsPlacementMode] = useState(false);
-  
-  // Clockwise rotation tracking state (0° to 315°)
   const [turnAngle, setTurnAngle] = useState<number>(0);
+
+  // Path Tracking states
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaModal, setMediaModal] = useState<MediaModalType>(null);
+  const [mediaInputText, setMediaInputText] = useState("");
+  const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
 
   // ==================================================
   // INITIAL BOOT DECK (CACHE DETECTOR)
@@ -78,18 +98,16 @@ export default function Dashboard() {
   }, []);
 
   // ==================================================
-  // CLOCKWISE ROTATION TRACKER ENGINE
+  // UPDATE JUNCTION ARROW ORIENTATION TRANSFORMS
   // ==================================================
   useEffect(() => {
     const markerElement = document.getElementById("junction-arrow-element");
     if (!markerElement) return;
-
-    // Direct geometric assignment for vector clock sweeps
     markerElement.style.transform = `rotate(${turnAngle}deg)`;
   }, [turnAngle]);
 
   // ==================================================
-  // INITIALIZE MAPBOX & INTERACTIVE MARKERS
+  // INITIALIZE MAPBOX & INDEPENDENT VECTOR SOURCES
   // ==================================================
   useEffect(() => {
     if (!baseLocation || !mapRef.current || mapInstanceRef.current) return;
@@ -99,7 +117,7 @@ export default function Dashboard() {
     let hasCache = false;
     try {
       if (localStorage.getItem(CACHE_KEY)) hasCache = true;
-    } catch {}
+    } catch { }
 
     const map = new mapboxgl.Map({
       container: mapRef.current,
@@ -117,6 +135,34 @@ export default function Dashboard() {
         "high-color": "rgb(245,245,247)",
         "horizon-blend": 0.02,
       });
+
+      // Inject runtime transactional line layers
+      map.addSource("recording-trail-source", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: [],
+          },
+        },
+      });
+
+      map.addLayer({
+        id: "recording-trail-layer",
+        type: "line",
+        source: "recording-trail-source",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#0052FF",
+          "line-width": 6,
+          "line-opacity": 0.85,
+        },
+      });
     });
 
     const userMarker = new mapboxgl.Marker({
@@ -132,7 +178,6 @@ export default function Dashboard() {
     map.on("click", (e) => {
       const el = mapRef.current;
       if (el && el.getAttribute("data-placement") === "true") {
-        
         if (junctionMarkerRef.current) {
           junctionMarkerRef.current.remove();
         }
@@ -148,17 +193,23 @@ export default function Dashboard() {
         markerContainer.style.borderRadius = "14px";
         markerContainer.style.boxShadow = "0 10px 25px rgba(0, 82, 255, 0.4)";
         markerContainer.style.border = "3px solid white";
-        
-        // Swapped ArrowUpRight out for ArrowUp to make 0° true north positioning clean
+
         markerContainer.innerHTML = `
           <div id="junction-arrow-element" style="transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); transform: rotate(${turnAngle}deg); display: flex; align-items: center; justify-content: center;">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
           </div>
         `;
 
+        // Direct action invocation on clicking the embedded custom arrow marker
+        markerContainer.addEventListener("click", (event) => {
+          event.stopPropagation();
+          // Toggle tracking loop state
+          setIsRecording((prev) => !prev);
+        });
+
         const junctionMarker = new mapboxgl.Marker({
           element: markerContainer,
-          draggable: true, 
+          draggable: true,
         })
           .setLngLat([e.lngLat.lng, e.lngLat.lat])
           .addTo(map);
@@ -177,6 +228,33 @@ export default function Dashboard() {
   }, [baseLocation]);
 
   // ==================================================
+  // LIVE PATH SYNC ON COMPONENT RECORDING STATUS CHANGES
+  // ==================================================
+  useEffect(() => {
+    if (isRecording && userLocation) {
+      // Initialize path array with current location coordinates
+      pathCoordsRef.current = [userLocation];
+      updateMapTrailSource();
+    }
+  }, [isRecording]);
+
+  const updateMapTrailSource = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const source = map.getSource("recording-trail-source") as mapboxgl.GeoJSONSource;
+    if (source) {
+      source.setData({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "LineString",
+          coordinates: pathCoordsRef.current,
+        },
+      });
+    }
+  };
+
+  // ==================================================
   // PERMANENT BACKGROUND GEOLOCATION WATCH DECK
   // ==================================================
   useEffect(() => {
@@ -188,7 +266,7 @@ export default function Dashboard() {
     let hasCache = false;
     try {
       if (localStorage.getItem(CACHE_KEY)) hasCache = true;
-    } catch {}
+    } catch { }
 
     if (!hasCache) {
       setLoadingStage("searching");
@@ -223,6 +301,12 @@ export default function Dashboard() {
                 essential: true,
               });
             }
+
+            // Append tracking path vectors if recording mode is active
+            if (isRecording) {
+              pathCoordsRef.current = [...pathCoordsRef.current, coords];
+              updateMapTrailSource();
+            }
           }
           return coords;
         });
@@ -233,7 +317,7 @@ export default function Dashboard() {
 
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify(coords));
-        } catch (e) {}
+        } catch (e) { }
 
         if (accuracy > 100) {
           if (!hasCache) setLoadingStage("improving");
@@ -259,10 +343,10 @@ export default function Dashboard() {
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, []);
+  }, [isRecording]);
 
   // ==================================================
-  // VIEW MODE TRANSITIONS
+  // ACTION DISPATCHERS
   // ==================================================
   const toggleView = () => {
     const map = mapInstanceRef.current;
@@ -277,42 +361,34 @@ export default function Dashboard() {
     }
   };
 
-  const retryLocation = () => {
-    setIsLoading(true);
-    setLoadingStage("searching");
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords: [number, number] = [
-          position.coords.longitude,
-          position.coords.latitude,
-        ];
-
-        setUserLocation(coords);
-        setIsLoading(false);
-
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(coords));
-        } catch (e) {}
-
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo({ center: coords, zoom: 17, speed: 1.1 });
-        }
-        if (userMarkerRef.current) {
-          userMarkerRef.current.setLngLat(coords);
-        }
-      },
-      (error) => {
-        console.log(error);
-        setIsLoading(false);
-      },
-      { enableHighAccuracy: true }
-    );
-  };
-
-  // STEP CLOCK SYSTEM: Progresses clockwise in clean 45-degree chunks
   const stepClockRotation = () => {
     setTurnAngle((prevAngle) => (prevAngle + 45) % 360);
+  };
+
+  const handleSaveMediaMarker = () => {
+    if (!userLocation || !mapInstanceRef.current) return;
+
+    const newMedia: WaypointMedia = {
+      type: mediaModal!,
+      content: mediaModal === "text" ? mediaInputText : `Sample metadata placeholder link tracking assets`,
+      coordinates: userLocation,
+    };
+
+    setSavedMedia((prev) => [...prev, newMedia]);
+
+    // Instantiate custom pin node marker onto the live trail map
+    const customMediaEl = document.createElement("div");
+    customMediaEl.className = "w-8 h-8 rounded-full bg-black text-white border-2 border-white shadow-lg flex items-center justify-center font-bold text-xs cursor-pointer";
+    customMediaEl.innerHTML = mediaModal === "text" ? "Txt" : mediaModal === "image" ? "Img" : "Voc";
+
+    new mapboxgl.Marker({ element: customMediaEl })
+      .setLngLat(userLocation)
+      .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<p class="p-2 text-sm text-black font-medium">${newMedia.content}</p>`))
+      .addTo(mapInstanceRef.current);
+
+    // Clear and reset modal parameters
+    setMediaInputText("");
+    setMediaModal(null);
   };
 
   const loadingMessage = {
@@ -330,20 +406,30 @@ export default function Dashboard() {
         className="w-full h-full"
       />
 
+      {/* TOP BAR CONNECTIVITY BADGE AND RECORDING ALERTS */}
       {!isLoading && userLocation && (
-        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40">
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2">
           <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/90 backdrop-blur-xl border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
             <Radar className="w-4 h-4 text-[#0052FF]" />
             <p className="text-xs font-semibold tracking-tight text-black/70">
               GPS Connected
             </p>
           </div>
+
+          {isRecording && (
+            <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-red-500 text-white shadow-md animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-white block animate-ping" />
+              <p className="text-[11px] font-bold tracking-tight uppercase">Live Recording Active</p>
+            </div>
+          )}
         </div>
       )}
 
+      {/* SIDEBAR RIGHT CONTROL HUB */}
       {!isLoading && userLocation && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3">
-          
+
+          {/* CONTROL SWITCH 1: VIEW TRANSITION CONFIGURATION */}
           <button
             onClick={toggleView}
             className="w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl bg-white/92 backdrop-blur-2xl border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)] whitespace-nowrap active:scale-[0.98] transition-all"
@@ -356,39 +442,28 @@ export default function Dashboard() {
               )}
             </div>
             <div className="flex flex-col items-center sm:items-start leading-none">
-              <span className="text-[8px] sm:text-[10px] font-medium text-black/35 uppercase tracking-wider">
-                View
-              </span>
-              <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight text-black">
-                {viewMode === "flat" ? "3D" : "2D"}
-              </span>
+              <span className="text-[8px] sm:text-[10px] font-medium text-black/35 uppercase tracking-wider">View</span>
+              <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight text-black">{viewMode === "flat" ? "3D" : "2D"}</span>
             </div>
           </button>
 
+          {/* CONTROL SWITCH 2: PLACE JUNCTION INDICATOR */}
           <button
             onClick={() => setIsPlacementMode(!isPlacementMode)}
-            className={`w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl border shadow-[0_10px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl whitespace-nowrap active:scale-[0.98] transition-all ${
-              isPlacementMode ? "bg-[#0052FF] border-[#0052FF] text-white" : "bg-white/92 border-black/[0.06] text-black"
-            }`}
+            className={`w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl border shadow-[0_10px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl whitespace-nowrap active:scale-[0.98] transition-all ${isPlacementMode ? "bg-[#0052FF] border-[#0052FF] text-white" : "bg-white/92 border-black/[0.06] text-black"
+              }`}
           >
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 ${
-              isPlacementMode ? "bg-white/20" : "bg-[#0052FF]/10"
-            }`}>
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 ${isPlacementMode ? "bg-white/20" : "bg-[#0052FF]/10"
+              }`}>
               <Navigation className={`w-4 h-4 ${isPlacementMode ? "text-white" : "text-[#0052FF]"}`} />
             </div>
             <div className="flex flex-col items-center sm:items-start leading-none">
-              <span className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${
-                isPlacementMode ? "text-white/60" : "text-black/35"
-              }`}>
-                Junction
-              </span>
-              <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight">
-                {isPlacementMode ? "Active" : "Place"}
-              </span>
+              <span className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${isPlacementMode ? "text-white/60" : "text-black/35"}`}>Junction</span>
+              <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight">{isPlacementMode ? "Active" : "Place"}</span>
             </div>
           </button>
 
-          {/* DYNAMIC TURN CONTROLLER: Cycles through angles in 45° steps */}
+          {/* CONTROL SWITCH 3: ROTATE JUNCTION ARROW BUTTON */}
           {junctionMarkerRef.current && (
             <button
               onClick={stepClockRotation}
@@ -398,19 +473,91 @@ export default function Dashboard() {
                 <ArrowUp className="w-4 h-4 text-[#0052FF]" />
               </div>
               <div className="flex flex-col items-center sm:items-start leading-none">
-                <span className="text-[8px] sm:text-[10px] font-medium text-black/35 uppercase tracking-wider">
-                  Turn
-                </span>
-                <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight text-black">
-                  {turnAngle}°
-                </span>
+                <span className="text-[8px] sm:text-[10px] font-medium text-black/35 uppercase tracking-wider">Turn</span>
+                <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight text-black">{turnAngle}°</span>
               </div>
             </button>
+          )}
+
+          {/* DYNAMIC RECORDING SYSTEM TRIGGER CONTROLLERS */}
+          {junctionMarkerRef.current && (
+            <button
+              onClick={() => setIsRecording(!isRecording)}
+              className={`w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl border shadow-[0_10px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl whitespace-nowrap active:scale-[0.98] transition-all ${isRecording ? "bg-red-500 border-red-500 text-white animate-pulse" : "bg-white border-black/[0.06] text-black"
+                }`}
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0">
+                {isRecording ? <OctagonAlert className="w-4 h-4 text-white" /> : <CirclePlay className="w-4 h-4 text-red-500" />}
+              </div>
+              <div className="flex flex-col items-center sm:items-start leading-none">
+                <span className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${isRecording ? "text-white/60" : "text-black/35"}`}>Record</span>
+                <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight">{isRecording ? "Stop" : "Start"}</span>
+              </div>
+            </button>
+          )}
+
+          {/* SIDEBAR MEDIA INJECTION DECK PANEL (LOCKS OUTSIDE RECORDING WINDOWS) */}
+          {isRecording && (
+            <div className="mt-4 p-2 bg-black/90 backdrop-blur-2xl rounded-2xl border border-white/10 flex flex-col gap-2 items-center shadow-2xl">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 pb-1 border-b border-white/10 w-full text-center">Add</span>
+
+              <button onClick={() => setMediaModal("text")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
+                <Type className="w-4 h-4" />
+              </button>
+
+              <button onClick={() => setMediaModal("image")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
+                <ImageIcon className="w-4 h-4" />
+              </button>
+
+              <button onClick={() => setMediaModal("voice")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
+                <Mic className="w-4 h-4" />
+              </button>
+            </div>
           )}
 
         </div>
       )}
 
+      {/* MODAL HUD ENGINES FOR MEDIA FEEDBACK */}
+      {mediaModal && (
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] border border-black/[0.06] shadow-2xl p-6 w-full max-w-sm relative">
+            <button onClick={() => setMediaModal(null)} className="absolute top-4 right-4 text-black/40 hover:text-black">
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base font-bold tracking-tight text-black capitalize mb-4 flex items-center gap-2">
+              {mediaModal === "text" && <Type className="w-5 h-5 text-[#0052FF]" />}
+              {mediaModal === "image" && <ImageIcon className="w-5 h-5 text-[#0052FF]" />}
+              {mediaModal === "voice" && <Mic className="w-5 h-5 text-[#0052FF]" />}
+              Attach {mediaModal} Waypoint
+            </h3>
+
+            {mediaModal === "text" ? (
+              <textarea
+                value={mediaInputText}
+                onChange={(e) => setMediaInputText(e.target.value)}
+                placeholder="Type routing instructions..."
+                className="w-full h-24 p-3 border border-black/10 rounded-xl text-sm focus:outline-none focus:border-[#0052FF] text-black resize-none"
+              />
+            ) : (
+              <div className="p-8 border-2 border-dashed border-black/10 rounded-xl bg-black/[0.02] flex flex-col items-center justify-center text-center">
+                <p className="text-xs font-semibold text-black/60">Capture active hardware simulation interface</p>
+                <p className="text-[11px] text-black/40 mt-1">Ready for hardware stream pipeline injection</p>
+              </div>
+            )}
+
+            <button
+              onClick={handleSaveMediaMarker}
+              className="mt-4 w-full h-11 rounded-xl bg-[#0052FF] hover:bg-[#003ECC] text-white text-sm font-semibold transition-all"
+            >
+              Pin onto Line Trail
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* APPLE ECOSYSTEM COMPONENT ANIMATED LOADING BLOCK HOOD */}
       {isLoading && (
         <div className="absolute inset-0 z-50 bg-[#f5f5f7]/80 backdrop-blur-xl flex items-center justify-center">
           <div className="flex flex-col items-center gap-5">
@@ -421,47 +568,24 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex flex-col items-center">
-              <h2 className="text-[15px] font-semibold tracking-tight text-black">
-                {loadingMessage}
-              </h2>
-              <p className="mt-1 text-sm text-black/45">
-                Syncing navigation environment
-              </p>
+              <h2 className="text-[15px] font-semibold tracking-tight text-black">{loadingMessage}</h2>
+              <p className="mt-1 text-sm text-black/45">Syncing navigation environment</p>
             </div>
           </div>
         </div>
       )}
 
-      {!isLoading && loadingStage === "improving" && (
-        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/90 backdrop-blur-xl border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
-            <LocateFixed className="w-4 h-4 text-[#0052FF] animate-pulse" />
-            <p className="text-xs font-semibold tracking-tight text-black/70">
-              Improving accuracy
-            </p>
-          </div>
-        </div>
-      )}
-
+      {/* RUNTIME ERROR POPUPS */}
       {!isLoading && !userLocation && (
         <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="w-full max-w-[360px] rounded-[32px] bg-white border border-black/[0.06] shadow-[0_30px_80px_rgba(0,0,0,0.12)] p-6">
             <div className="w-14 h-14 rounded-2xl bg-[#0052FF]/10 flex items-center justify-center">
               <Navigation className="w-6 h-6 text-[#0052FF]" />
             </div>
-            <h2 className="mt-5 text-xl font-bold tracking-tight text-black">
-              Location unavailable
-            </h2>
+            <h2 className="mt-5 text-xl font-bold tracking-tight text-black">Location unavailable</h2>
             <p className="mt-2 text-sm leading-relaxed text-black/55">
               Trace could not access your GPS location. Please allow location permissions and try again.
             </p>
-            <button
-              onClick={retryLocation}
-              className="mt-6 w-full h-12 rounded-2xl bg-black text-white text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-            >
-              <RefreshCcw className="w-4 h-4" />
-              Try Again
-            </button>
           </div>
         </div>
       )}
