@@ -33,15 +33,6 @@ export default function TraceWorkspacePage() {
   const [traceTitleInput, setTraceTitleInput] = useState("Unfinished Trail Trace");
   const [trailCoordinates, setTrailCoordinates] = useState<[number, number][]>([]);
 
-  // Engine Connection #1: Mapbox canvas lifecycle engine
-  const { 
-    viewMode, 
-    toggleViewPerspective, 
-    handleLocationStream, 
-    updateVectorPath, 
-    injectDOMMarker 
-  } = useMapEngine(mapRef, trailCoordinates[0] || null, setActiveWaypoint);
-
   // Engine Connection #2: Hardware device telemetry location tracking engine
   const { baseLocation, userLocation, isLoading, loadingStage } = useGPSTracker(
     isRecording,
@@ -51,6 +42,15 @@ export default function TraceWorkspacePage() {
       updateVectorPath(updatedPath);
     }
   );
+
+  // Engine Connection #1: Mapbox canvas lifecycle engine
+  const { 
+    viewMode, 
+    toggleViewPerspective, 
+    handleLocationStream, 
+    updateVectorPath, 
+    injectDOMMarker 
+  } = useMapEngine(mapRef, baseLocation, setActiveWaypoint);
 
   const handleSaveMediaMarker = () => {
     if (!userLocation || !mediaModal) return;

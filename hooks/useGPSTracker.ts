@@ -30,13 +30,28 @@ export function useGPSTracker(
   const isRecordingRef = useRef(isRecording);
   const pathCoordsRef = useRef<[number, number][]>([]);
 
+  // FIX #1 & #2: Store callbacks in stable refs so they never appear in
+  // useEffect dependency arrays. This prevents the GPS watchPosition from
+  // being torn down and recreated on every single render.
+  const onLocationUpdateRef = useRef(onLocationUpdate);
+  const onPathAppendRef = useRef(onPathAppend);
+
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
-  // Bootstrap Position
+  useEffect(() => {
+    onLocationUpdateRef.current = onLocationUpdate;
+  }, [onLocationUpdate]);
+
+  useEffect(() => {
+    onPathAppendRef.current = onPathAppend;
+  }, [onPathAppend]);
+
+  // Bootstrap Position — get initial location from cache or IP
   useEffect(() => {
     async function prepareMap() {
+      // 1. Try cached location first (instant)
       try {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
@@ -51,34 +66,33 @@ export function useGPSTracker(
         console.error("Cache read error:", e);
       }
 
+      // 2. No cache — show "searching" while we fetch IP location
+      setLoadingStage("searching");
+
+      // FIX #3: The old code only set baseLocation here, leaving userLocation
+      // as null. If GPS then failed or timed out, the map would render but the
+      // ControlDeck would never appear (it gates on userLocation being set).
+      // Now we set BOTH so the user always sees a usable map.
+      let initialCoords: [number, number] = [3.3792, 6.5244];
       try {
         const response = await fetch("https://ipapi.co/json/");
         const data = await response.json();
         if (data.longitude && data.latitude) {
-          setBaseLocation([data.longitude, data.latitude]);
-        } else {
-          setBaseLocation([3.3792, 6.5244]);
+          initialCoords = [data.longitude, data.latitude];
         }
-      } catch {
-        setBaseLocation([3.3792, 6.5244]);
-      }
+      } catch {}
+
+      setBaseLocation(initialCoords);
+      setUserLocation(initialCoords);
+      setIsLoading(false);
+      setLoadingStage("done");
     }
     prepareMap();
   }, []);
 
-  // Hardware Telemetry Stream
+  // GPS Hardware Telemetry Stream — refines location in real-time
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setIsLoading(false);
-      return;
-    }
-
-    let hasCache = false;
-    try {
-      if (localStorage.getItem(CACHE_KEY)) hasCache = true;
-    } catch {}
-
-    if (!hasCache) setLoadingStage("searching");
+    if (!navigator.geolocation) return;
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -99,20 +113,21 @@ export function useGPSTracker(
             ];
           }
 
-          onLocationUpdate(finalCoords, heading);
+          // Use refs instead of direct callback params
+          onLocationUpdateRef.current(finalCoords, heading);
 
           if (isRecordingRef.current) {
             const history = pathCoordsRef.current;
             if (history.length === 0) {
               pathCoordsRef.current = [finalCoords];
-              onPathAppend(pathCoordsRef.current);
+              onPathAppendRef.current(pathCoordsRef.current);
             } else {
               const lastSavedPoint = history[history.length - 1];
               const distanceMoved = getDistanceMeters(lastSavedPoint, finalCoords);
 
               if (distanceMoved > 3.5) {
                 pathCoordsRef.current = [...history, finalCoords];
-                onPathAppend(pathCoordsRef.current);
+                onPathAppendRef.current(pathCoordsRef.current);
               }
             }
           }
@@ -124,12 +139,16 @@ export function useGPSTracker(
           localStorage.setItem(CACHE_KEY, JSON.stringify([rawLng, rawLat]));
         } catch (e) {}
 
+        // If bootstrap hasn't finished yet, GPS arriving first clears loading
         setLoadingStage("done");
         setIsLoading(false);
       },
       (error) => {
         console.error("GPS stream alert:", error);
+        // GPS failed — bootstrap will have already set a fallback location,
+        // so just make sure the loading overlay is cleared.
         setIsLoading(false);
+        setLoadingStage("done");
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -137,7 +156,9 @@ export function useGPSTracker(
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, [onLocationUpdate, onPathAppend]);
+    // FIX #2: Empty deps — callbacks are accessed via stable refs,
+    // so this effect runs exactly once and the watch is never torn down.
+  }, []);
 
   return { baseLocation, userLocation, isLoading, loadingStage, pathCoords: pathCoordsRef.current };
 }
