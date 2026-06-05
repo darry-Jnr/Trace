@@ -1,21 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import mapboxgl from "mapbox-gl";
 import {
-  Navigation,
-  LoaderCircle,
   Map,
   Mountain,
-  Radar,
-  ArrowUp,
-  CirclePlay,
-  OctagonAlert,
-  Mic,
-  Image as ImageIcon,
+  Plus,
   Type,
-  X
+  Image as ImageIcon,
+  Mic,
+  X,
+  MapPin,
+  Calendar,
+  Compass
 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -45,11 +45,13 @@ const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) =
   return R * c;
 };
 
-export default function Dashboard() {
+export default function TraceWorkspacePage() {
+  const router = useRouter();
+  const toast = useToast();
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const junctionMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
   const pathCoordsRef = useRef<[number, number][]>([]);
@@ -61,23 +63,27 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<LoadingStage>("booting");
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
-  const [isPlacementMode, setIsPlacementMode] = useState(false);
-  const [turnAngle, setTurnAngle] = useState<number>(0);
 
   const [isRecording, setIsRecording] = useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [mediaModal, setMediaModal] = useState<MediaModalType>(null);
   const [mediaInputText, setMediaInputText] = useState("");
   const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
+  
+  // Save flow view states
+  const [showSaveReview, setShowSaveReview] = useState(false);
+  const [traceTitleInput, setTraceTitleInput] = useState("Unfinished Trail Trace");
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
+    if (!isRecording) setIsAddMenuOpen(false);
   }, [isRecording]);
 
   useEffect(() => {
     userLocationRef.current = userLocation;
   }, [userLocation]);
 
-  // 1. BOOTSTRAP INITIAL COORDINATES SAFELY
+  // Bootstrap position
   useEffect(() => {
     async function prepareMap() {
       try {
@@ -109,13 +115,7 @@ export default function Dashboard() {
     prepareMap();
   }, []);
 
-  useEffect(() => {
-    const markerElement = document.getElementById("junction-arrow-element");
-    if (!markerElement) return;
-    markerElement.style.transform = `rotate(${turnAngle}deg)`;
-  }, [turnAngle]);
-
-  // 2. LIFECYCLE SAFE MAPBOX INITIALIZATION (PREVENTS WEBGL CONTEXT LOSS)
+  // Mapbox Canvas Instance Build
   useEffect(() => {
     if (!baseLocation || !mapRef.current || mapInstanceRef.current) return;
 
@@ -128,7 +128,7 @@ export default function Dashboard() {
 
     const map = new mapboxgl.Map({
       container: mapRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: "mapbox://styles/mapbox/light-v11",
       center: baseLocation,
       zoom: hasCache ? 17 : 14,
       pitch: 0,
@@ -138,8 +138,8 @@ export default function Dashboard() {
 
     map.on("style.load", () => {
       map.setFog({
-        color: "rgb(255,255,255)",
-        "high-color": "rgb(245,245,247)",
+        color: "rgb(245, 245, 247)",
+        "high-color": "rgb(255, 255, 255)",
         "horizon-blend": 0.02,
       });
 
@@ -157,51 +157,28 @@ export default function Dashboard() {
         type: "line",
         source: "recording-trail-source",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 6, "line-opacity": 0.85 },
+        paint: { 
+          "line-color": "#0052FF", // High-visibility premium tracking blue route vector line
+          "line-width": 5.5, 
+          "line-opacity": 0.95 
+        },
       });
     });
 
-    const userMarker = new mapboxgl.Marker({ color: "#0052FF", scale: 1.1 })
+    // Custom brand pin anchor highlighting active telemetry position
+    const el = document.createElement("div");
+    el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-4 border-white shadow-[0_2px_10px_rgba(0,82,255,0.4)] flex items-center justify-center relative";
+    // Wave pulse visual context indicator
+    el.innerHTML = `<span class="absolute inset-0 rounded-full bg-[#0052FF]/30 animate-ping scale-150 pointer-events-none" style="animation-duration: 2s;" />`;
+
+    const userMarker = new mapboxgl.Marker({ element: el })
       .setLngLat(baseLocation)
       .addTo(map);
 
     mapInstanceRef.current = map;
     userMarkerRef.current = userMarker;
 
-    map.on("click", (e) => {
-      const el = mapRef.current;
-      if (el && el.getAttribute("data-placement") === "true") {
-        if (junctionMarkerRef.current) junctionMarkerRef.current.remove();
-
-        const markerContainer = document.createElement("div");
-        markerContainer.className = "cursor-grab active:cursor-grabbing";
-        markerContainer.style.width = "44px";
-        markerContainer.style.height = "44px";
-        markerContainer.style.display = "flex";
-        markerContainer.style.alignItems = "center";
-        markerContainer.style.justifyContent = "center";
-        markerContainer.style.backgroundColor = "#0052FF";
-        markerContainer.style.borderRadius = "14px";
-        markerContainer.style.boxShadow = "0 10px 25px rgba(0, 82, 255, 0.4)";
-        markerContainer.style.border = "3px solid white";
-
-        markerContainer.innerHTML = `
-          <div id="junction-arrow-element" style="transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); transform: rotate(${turnAngle}deg); display: flex; align-items: center; justify-content: center;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-          </div>
-        `;
-
-        const junctionMarker = new mapboxgl.Marker({ element: markerContainer, draggable: true })
-          .setLngLat([e.lngLat.lng, e.lngLat.lat])
-          .addTo(map);
-
-        junctionMarkerRef.current = junctionMarker;
-        setIsPlacementMode(false);
-      }
-    });
-
     return () => {
-      if (junctionMarkerRef.current) junctionMarkerRef.current.remove();
       if (userMarkerRef.current) userMarkerRef.current.remove();
       map.remove();
       mapInstanceRef.current = null;
@@ -228,7 +205,7 @@ export default function Dashboard() {
     }
   };
 
-  // 3. SECURE BACKGROUND GEOLOCATION WATCH DECK WITH TIMEOUT SAFETY NETS
+  // GPS background telemetry watch loop
   useEffect(() => {
     if (!navigator.geolocation) {
       setIsLoading(false);
@@ -267,8 +244,6 @@ export default function Dashboard() {
             Math.abs(prevUserLocation[1] - finalCoords[1]) > 0.00003;
 
           if (locationChanged && mapInstanceRef.current) {
-            // CRITICAL FIX: Only rotate the map to heading if recording is true!
-            // Otherwise, lock target bearing strictly to 0 (clean top-down north view)
             const targetBearing = (isRecordingRef.current && heading !== null && heading !== undefined)
               ? heading
               : 0;
@@ -323,12 +298,11 @@ export default function Dashboard() {
       },
       (error) => {
         console.error("GPS stream alert:", error);
-        // NON-BLOCKING CATCH-ALL: Prevents timeouts on laptops from completely bricking the UI
         setIsLoading(false);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000, // Safe baseline window
+        timeout: 10000,
         maximumAge: 0,
       }
     );
@@ -353,10 +327,6 @@ export default function Dashboard() {
     }
   };
 
-  const stepClockRotation = () => {
-    setTurnAngle((prevAngle) => (prevAngle + 45) % 360);
-  };
-
   const handleSaveMediaMarker = () => {
     const placementCoords = userLocationRef.current;
     if (!placementCoords || !mapInstanceRef.current) return;
@@ -370,16 +340,37 @@ export default function Dashboard() {
     setSavedMedia((prev) => [...prev, newMedia]);
 
     const customMediaEl = document.createElement("div");
-    customMediaEl.className = "w-8 h-8 rounded-full bg-black text-white border-2 border-white shadow-lg flex items-center justify-center font-bold text-[10px] cursor-pointer transform transition-transform active:scale-95";
-    customMediaEl.innerHTML = mediaModal === "text" ? "Txt" : mediaModal === "image" ? "Img" : "Voc";
+    customMediaEl.className = "w-8 h-8 rounded-[10px] bg-[#0052FF] text-white border-2 border-white shadow-[0_4px_12px_rgba(0,82,255,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95";
+    
+    let innerIcon = "Txt";
+    if (mediaModal === "image") innerIcon = "Img";
+    if (mediaModal === "voice") innerIcon = "Voc";
+    customMediaEl.innerHTML = `<span class="text-[10px] font-bold tracking-tight">${innerIcon}</span>`;
 
     new mapboxgl.Marker({ element: customMediaEl })
       .setLngLat(placementCoords)
-      .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<p class="p-2 text-xs text-black font-semibold">${newMedia.content}</p>`))
+      .setPopup(
+        new mapboxgl.Popup({ offset: 14, closeButton: false })
+          .setHTML(`<p class="px-2.5 py-1.5 text-xs text-black font-semibold tracking-tight">${newMedia.content}</p>`)
+      )
       .addTo(mapInstanceRef.current);
 
     setMediaInputText("");
     setMediaModal(null);
+    setIsAddMenuOpen(false);
+  };
+
+  // Triggers the beautiful full-screen review canvas
+  const handleStopRecordingFlow = () => {
+    setIsRecording(false);
+    setShowSaveReview(true);
+  };
+
+  // Commits details, pushes success toast notification, sends user home
+  const handleCommitSaveTrace = () => {
+    setShowSaveReview(false);
+    toast.success("Trace Saved Successfully", `"${traceTitleInput}" has been safely archived in your dashboard workspace.`);
+    router.push("/dashboard");
   };
 
   const loadingMessage = {
@@ -390,146 +381,240 @@ export default function Dashboard() {
   }[loadingStage];
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#f5f5f7]">
-      <div ref={mapRef} data-placement={isPlacementMode} className="w-full h-full" />
+    <div className="relative w-screen h-screen overflow-hidden bg-[#f5f5f7] font-sans selection:bg-black selection:text-white">
+      {/* Mapbox Canvas Surface Viewport */}
+      <div ref={mapRef} className="w-full h-full z-0" />
 
+      {/* Control Deck Overlay Panel */}
       {!isLoading && userLocation && (
-        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/90 backdrop-blur-xl border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
-            <Radar className="w-4 h-4 text-[#0052FF]" />
-            <p className="text-xs font-semibold tracking-tight text-black/70">GPS Connected</p>
-          </div>
-
-          {isRecording && (
-            <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-red-500 text-white shadow-md animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-white block animate-ping" />
-              <p className="text-[11px] font-bold tracking-tight uppercase">Live Recording Active</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!isLoading && userLocation && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3">
+        <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3 items-center">
+          
+          {/* View Mode Node Toggle */}
           <button
             onClick={toggleView}
-            className="w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl bg-white/92 backdrop-blur-2xl border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)] whitespace-nowrap active:scale-[0.98] transition-all"
+            className="w-14 h-14 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl border border-black/[0.04] rounded-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] active:scale-[0.96] transition-all group"
           >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#0052FF]/10 flex items-center justify-center shrink-0">
-              {viewMode === "flat" ? <Mountain className="w-4 h-4 text-[#0052FF]" /> : <Map className="w-4 h-4 text-[#0052FF]" />}
-            </div>
-            <div className="flex flex-col items-center sm:items-start leading-none">
-              <span className="text-[8px] sm:text-[10px] font-medium text-black/35 uppercase tracking-wider">View</span>
-              <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight text-black">{viewMode === "flat" ? "3D" : "2D"}</span>
-            </div>
+            {viewMode === "flat" ? (
+              <Mountain className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors" />
+            ) : (
+              <Map className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors" />
+            )}
+            <span className="text-[9px] font-bold tracking-tight uppercase text-black/40 mt-1">
+              {viewMode === "flat" ? "3D" : "2D"}
+            </span>
           </button>
 
+          {/* Core Recording Stream Action Trigger */}
           <button
-            onClick={() => setIsPlacementMode(!isPlacementMode)}
-            className={`w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl border shadow-[0_10px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl whitespace-nowrap active:scale-[0.98] transition-all ${isPlacementMode ? "bg-[#0052FF] border-[#0052FF] text-white" : "bg-white/92 border-black/[0.06] text-black"
-              }`}
+            onClick={isRecording ? handleStopRecordingFlow : () => setIsRecording(true)}
+            className={`w-14 h-14 flex flex-col items-center justify-center rounded-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] active:scale-[0.96] transition-all ${
+              isRecording 
+                ? "bg-black text-white" 
+                : "bg-white border border-black/[0.04] text-[#0052FF]"
+            }`}
           >
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 ${isPlacementMode ? "bg-white/20" : "bg-[#0052FF]/10"}`}>
-              <Navigation className={`w-4 h-4 ${isPlacementMode ? "text-white" : "text-[#0052FF]"}`} />
-            </div>
-            <div className="flex flex-col items-center sm:items-start leading-none">
-              <span className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${isPlacementMode ? "text-white/60" : "text-black/35"}`}>Junction</span>
-              <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight">{isPlacementMode ? "Active" : "Place"}</span>
-            </div>
+            <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? "bg-white animate-pulse" : "bg-[#0052FF]"}`} />
+            <span className={`text-[9px] font-bold tracking-tight uppercase mt-1.5 ${isRecording ? "text-white/60" : "text-black/50"}`}>
+              {isRecording ? "Stop" : "Start"}
+            </span>
           </button>
 
-          {junctionMarkerRef.current && (
-            <button
-              onClick={stepClockRotation}
-              className="w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl bg-white/92 border border-black/[0.06] shadow-[0_10px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl whitespace-nowrap active:scale-[0.98] transition-all text-black"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#0052FF]/10 flex items-center justify-center shrink-0">
-                <ArrowUp className="w-4 h-4 text-[#0052FF]" />
-              </div>
-              <div className="flex flex-col items-center sm:items-start leading-none">
-                <span className="text-[8px] sm:text-[10px] font-medium text-black/35 uppercase tracking-wider">Turn</span>
-                <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight text-black">{turnAngle}°</span>
-              </div>
-            </button>
-          )}
-
-          {junctionMarkerRef.current && (
-            <button
-              onClick={() => setIsRecording(!isRecording)}
-              className={`w-14 h-14 flex flex-col items-center justify-center p-0 gap-1 sm:w-auto sm:h-14 sm:flex-row sm:px-5 sm:gap-3 rounded-2xl border shadow-[0_10px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl whitespace-nowrap active:scale-[0.98] transition-all ${isRecording ? "bg-red-500 border-red-500 text-white animate-pulse" : "bg-white border-black/[0.06] text-black"
-                }`}
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0">
-                {isRecording ? <OctagonAlert className="w-4 h-4 text-white" /> : <CirclePlay className="w-4 h-4 text-red-500" />}
-              </div>
-              <div className="flex flex-col items-center sm:items-start leading-none">
-                <span className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${isRecording ? "text-white/60" : "text-black/35"}`}>Record</span>
-                <span className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm font-semibold tracking-tight">{isRecording ? "Stop" : "Start"}</span>
-              </div>
-            </button>
-          )}
-
+          {/* Layer Asset Deployment Node Cluster Drawer */}
           {isRecording && (
-            <div className="mt-4 p-2 bg-black/90 backdrop-blur-2xl rounded-2xl border border-white/10 flex flex-col gap-2 items-center shadow-2xl">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 pb-1 border-b border-white/10 w-full text-center">Add</span>
-              <button onClick={() => setMediaModal("text")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
-                <Type className="w-4 h-4" />
+            <div className="flex flex-col gap-2 items-center mt-2 pt-2 border-t border-black/[0.05]">
+              <button
+                onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                className={`w-12 h-12 rounded-[16px] flex items-center justify-center shadow-sm transition-all active:scale-95 ${
+                  isAddMenuOpen 
+                    ? "bg-black text-white rotate-45" 
+                    : "bg-white border border-black/[0.04] text-black/60 hover:text-black"
+                }`}
+              >
+                <Plus className="w-5 h-5 stroke-[2.5]" />
               </button>
-              <button onClick={() => setMediaModal("image")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
-                <ImageIcon className="w-4 h-4" />
-              </button>
-              <button onClick={() => setMediaModal("voice")} className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all">
-                <Mic className="w-4 h-4" />
-              </button>
+
+              {/* Nested Drawer Triggers */}
+              {isAddMenuOpen && (
+                <div className="flex flex-col gap-2 p-1.5 bg-white/95 backdrop-blur-xl rounded-[18px] border border-black/[0.04] shadow-md animate-fade-in-up">
+                  <button 
+                    onClick={() => setMediaModal("text")} 
+                    className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95"
+                    title="Add Text Note"
+                  >
+                    <Type className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setMediaModal("image")} 
+                    className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95"
+                    title="Attach Photo"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setMediaModal("voice")} 
+                    className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95"
+                    title="Record Audio"
+                  >
+                    <Mic className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
+      {/* Media Input Drawer Submodal */}
       {mediaModal && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[28px] border border-black/[0.06] shadow-2xl p-6 w-full max-w-sm relative">
-            <button onClick={() => setMediaModal(null)} className="absolute top-4 right-4 text-black/40 hover:text-black">
-              <X className="w-5 h-5" />
+        <div className="absolute inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[26px] border border-black/[0.04] shadow-[0_24px_60px_rgba(0,0,0,0.08)] p-6 w-full max-w-sm relative animate-scale-up">
+            <button 
+              onClick={() => setMediaModal(null)} 
+              className="absolute top-4 right-4 text-black/30 hover:text-black w-6 h-6 flex items-center justify-center rounded-full bg-black/[0.03]"
+            >
+              <X className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
-            <h3 className="text-base font-bold tracking-tight text-black capitalize mb-4 flex items-center gap-2">
-              {mediaModal === "text" && <Type className="w-5 h-5 text-[#0052FF]" />}
-              {mediaModal === "image" && <ImageIcon className="w-5 h-5 text-[#0052FF]" />}
-              {mediaModal === "voice" && <Mic className="w-5 h-5 text-[#0052FF]" />}
-              Attach {mediaModal} Waypoint
+            
+            <h3 className="text-sm font-semibold tracking-tight text-black capitalize mb-4 flex items-center gap-2">
+              {mediaModal === "text" && <Type className="w-4 h-4 text-[#0052FF]" />}
+              {mediaModal === "image" && <ImageIcon className="w-4 h-4 text-[#0052FF]" />}
+              {mediaModal === "voice" && <Mic className="w-4 h-4 text-[#0052FF]" />}
+              Attach {mediaModal} Point
             </h3>
+
             {mediaModal === "text" ? (
               <textarea
                 value={mediaInputText}
                 onChange={(e) => setMediaInputText(e.target.value)}
-                placeholder="Type routing instructions..."
-                className="w-full h-24 p-3 border border-black/10 rounded-xl text-sm focus:outline-none focus:border-[#0052FF] text-black resize-none"
+                placeholder="Leave context directions at this exact moment..."
+                className="w-full h-24 p-3.5 bg-black/[0.02] border border-black/10 rounded-xl text-xs font-medium focus:outline-none focus:border-[#0052FF] text-black resize-none tracking-tight leading-normal"
               />
             ) : (
-              <div className="p-8 border-2 border-dashed border-black/10 rounded-xl bg-black/[0.02] flex flex-col items-center justify-center text-center">
-                <p className="text-xs font-semibold text-black/60">Capture active hardware simulation interface</p>
-                <p className="text-[11px] text-black/40 mt-1">Ready for hardware stream pipeline injection</p>
+              <div className="p-8 border border-dashed border-black/10 rounded-xl bg-black/[0.01] flex flex-col items-center justify-center text-center">
+                <p className="text-xs font-semibold text-black/60 tracking-tight">Hardware device telemetry stream ready</p>
+                <p className="text-[11px] font-medium text-black/35 mt-0.5 tracking-tight">Ready for {mediaModal} stream sync injection</p>
               </div>
             )}
-            <button onClick={handleSaveMediaMarker} className="mt-4 w-full h-11 rounded-xl bg-[#0052FF] hover:bg-[#003ECC] text-white text-sm font-semibold transition-all">
+
+            <button 
+              onClick={handleSaveMediaMarker} 
+              className="mt-4 w-full h-11 rounded-[14px] bg-black text-white text-xs font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+            >
               Pin onto Line Trail
             </button>
           </div>
         </div>
       )}
 
-      {isLoading && (
-        <div className="absolute inset-0 z-50 bg-[#f5f5f7]/80 backdrop-blur-xl flex items-center justify-center">
-          <div className="flex flex-col items-center gap-5">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-[#0052FF]/10 blur-2xl scale-150" />
-              <div className="relative w-16 h-16 rounded-3xl bg-white border border-black/[0.06] shadow-[0_20px_60px_rgba(0,0,0,0.08)] flex items-center justify-center">
-                <LoaderCircle className="w-7 h-7 text-[#0052FF] animate-spin" />
+      {/* Premium Full-Screen Trace Review Canvas (Triggered on Session Stop) */}
+      {showSaveReview && (
+        <div className="absolute inset-0 bg-[#f5f5f7] z-50 flex flex-col animate-slide-up select-none">
+          
+          {/* Header Action Row Bar */}
+          <header className="h-20 w-full px-6 flex items-center justify-between bg-white border-b border-black/[0.04]">
+            <button 
+              onClick={() => setShowSaveReview(false)}
+              className="w-10 h-10 rounded-[12px] bg-black/[0.03] hover:bg-black/[0.06] text-black/70 flex items-center justify-center transition-all active:scale-95"
+              aria-label="Close review"
+            >
+              <X className="w-[18px] h-[18px] stroke-[2.5]" />
+            </button>
+            <span className="text-xs font-bold uppercase tracking-widest text-black/40">
+              Review Map Trace
+            </span>
+            <div className="w-10 h-10 opacity-0 pointer-events-none" /> {/* Alignment Spacer */}
+          </header>
+
+          {/* Full Screen Interactive Snapshot Panel Layout Box */}
+          <div className="flex-1 max-w-md w-full mx-auto px-6 flex flex-col justify-center gap-8 py-10">
+            
+            {/* Synthetic Vector Map Snapshot Graphic Frame Component */}
+            <div className="w-full aspect-[4/3] bg-white rounded-[28px] border border-black/[0.04] shadow-[0_12px_40px_rgba(0,0,0,0.02)] relative overflow-hidden flex items-center justify-center p-6 group">
+              {/* Dot Grid Background representation */}
+              <div className="absolute inset-0 bg-[radial-gradient(#0052FF_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.06]" />
+              
+              {/* Captured Route Track Line Art */}
+              <svg className="w-48 h-24 text-black/[0.08]" viewBox="0 0 200 100" fill="none" stroke="currentColor" strokeWidth={4}>
+                <path 
+                  d="M 20 75 C 40 40, 80 90, 120 40 C 140 20, 160 50, 180 35" 
+                  stroke="#0052FF" 
+                  strokeLinecap="round" 
+                  strokeWidth={4.5}
+                />
+                <g transform="translate(180, 35)">
+                  <circle cx="0" cy="0" r="4" fill="#0052FF" />
+                </g>
+              </svg>
+
+              {/* Waypoint count badge pins overview */}
+              <div className="absolute bottom-4 left-4 flex gap-1.5">
+                <span className="px-2 py-1 rounded-[8px] bg-black text-white text-[9px] font-bold tracking-tight">
+                  {savedMedia.length} Waypoints
+                </span>
+                <span className="px-2 py-1 rounded-[8px] bg-black/[0.04] text-black/50 text-[9px] font-bold tracking-tight">
+                  {pathCoordsRef.current.length > 0 ? "0.2 mi" : "0.0 mi"}
+                </span>
+              </div>
+              <Compass className="absolute top-4 right-4 w-4 h-4 text-black/20" />
+            </div>
+
+            {/* Metatext Data Configuration Panel Details */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 block mb-1.5 px-1">
+                  Trace Identifier Title
+                </label>
+                <input 
+                  type="text"
+                  value={traceTitleInput}
+                  onChange={(e) => setTraceTitleInput(e.target.value)}
+                  className="w-full h-12 px-4 bg-white border border-black/10 rounded-[16px] text-sm font-semibold text-black focus:outline-none focus:border-[#0052FF] shadow-sm transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="bg-white border border-black/[0.03] p-3.5 rounded-[16px] flex items-center gap-3">
+                  <MapPin className="w-4 h-4 text-[#0052FF] shrink-0" />
+                  <div className="leading-none">
+                    <span className="text-[9px] font-bold text-black/35 block uppercase tracking-tight">Coordinates</span>
+                    <span className="text-xs font-bold text-black block mt-0.5">Vector Set</span>
+                  </div>
+                </div>
+                <div className="bg-white border border-black/[0.03] p-3.5 rounded-[16px] flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-[#0052FF] shrink-0" />
+                  <div className="leading-none">
+                    <span className="text-[9px] font-bold text-black/35 block uppercase tracking-tight">Timestamp</span>
+                    <span className="text-xs font-bold text-black block mt-0.5">Just Now</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex flex-col items-center">
-              <h2 className="text-[15px] font-semibold tracking-tight text-black">{loadingMessage}</h2>
-              <p className="mt-1 text-sm text-black/45">Syncing navigation environment</p>
+
+            {/* Bottom Form Submission Controller Save Action Button */}
+            <button
+              onClick={handleCommitSaveTrace}
+              className="w-full h-12 rounded-[16px] bg-black text-white text-sm font-semibold tracking-tight shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center mt-2"
+            >
+              Save & Publish Trail Link
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Screen Initial Setup Setup Overlay Loader */}
+      {isLoading && (
+        <div className="absolute inset-0 z-50 bg-[#f5f5f7] flex items-center justify-center select-none">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-12 h-12 rounded-[14px] bg-black flex items-center justify-center shadow-md animate-pulse">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white animate-spin" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="6" cy="18" r="1.5" className="fill-white" />
+                <path d="M6 18C6 12 18 12 18 6" />
+                <circle cx="18" cy="6" r="1.5" className="fill-white" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-[14px] font-semibold tracking-tight text-black">{loadingMessage}</h2>
+              <p className="text-xs font-medium text-black/35 mt-0.5 tracking-tight">Syncing navigation environment...</p>
             </div>
           </div>
         </div>
