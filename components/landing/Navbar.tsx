@@ -2,40 +2,15 @@
 
 import Link from "next/link";
 import React from "react";
-import {
-  Sun,
-  Sunset,
-  MoonStar,
-} from "lucide-react";
 
-const Navbar = () => {
-  const hour = new Date().getHours();
-
-  const greeting =
-    hour < 12
-      ? "Good morning"
-      : hour < 17
-      ? "Good afternoon"
-      : hour < 21
-      ? "Good evening"
-      : "Good night";
-
-  const GreetingIcon =
-    hour < 12
-      ? Sun
-      : hour < 17
-      ? Sun
-      : hour < 21
-      ? Sunset
-      : MoonStar;
-
+export default function Navbar() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#f5f5f3]/80 backdrop-blur-xl border-b border-black/[0.04]">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-50 bg-[#f5f5f7]/80 backdrop-blur-xl border-b border-black/[0.04]">
+      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
 
         {/* Logo */}
-        <Link
-          href="/"
+        <Link 
+          href="/" 
           className="flex items-center gap-3 group"
         >
           {/* Custom Squircle Icon Frame */}
@@ -64,17 +39,15 @@ const Navbar = () => {
           </span>
         </Link>
 
-        {/* Greeting */}
-        <div className="flex items-center gap-2 text-black/45">
-          <GreetingIcon className="w-4 h-4" />
-          <p className="text-[13px] font-medium tracking-tight">
-            {greeting}
-          </p>
-        </div>
-
+        {/* CTA Button */}
+        <Link 
+          href="/dashboard" 
+          className="rounded-[16px] px-5 h-10 bg-black text-white text-sm font-medium flex items-center justify-center shadow-none transition-all hover:scale-[1.02] active:scale-[0.98]"
+        >
+          Get started
+        </Link>
+        
       </div>
     </header>
   );
-};
-
-export default Navbar;
+}

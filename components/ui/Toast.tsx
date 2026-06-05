@@ -40,9 +40,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const addToast = useCallback((type: ToastType, title: string, message?: string, duration = 5000) => {
+  const addToast = useCallback((type: ToastType, title: string, message?: string, duration = 4000) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, title, message, type, duration }]);
+    // Stack newest notifications on top by appending to the front
+    setToasts((prev) => [{ id, title, message, type, duration }, ...prev]);
   }, []);
 
   const toast = {
@@ -62,7 +63,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast: (id: string) => void }) {
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
+    /* Positioned perfectly at the top center with comfortable status clearance */
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2.5 max-w-sm w-full px-4 sm:px-0 pointer-events-none items-center">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
       ))}
@@ -76,7 +78,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   useEffect(() => {
     const autoDismissTimer = setTimeout(() => {
       handleClose();
-    }, toast.duration || 5000);
+    }, toast.duration || 4000);
 
     return () => clearTimeout(autoDismissTimer);
   }, [toast.duration]);
@@ -85,56 +87,47 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     setIsExiting(true);
     setTimeout(() => {
       onClose();
-    }, 300); // match fade-out/slide-out animation length
+    }, 200); // Fluid drop action timing
   };
 
+  // Custom cohesive brand vectors matching your system identity curves
   const getIcon = () => {
     switch (toast.type) {
       case "success":
         return (
-          <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          <div className="w-7 h-7 rounded-[9px] bg-black text-white flex items-center justify-center shrink-0 shadow-sm">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
             </svg>
           </div>
         );
       case "error":
         return (
-          <div className="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          <div className="w-7 h-7 rounded-[9px] bg-[#FF3B30] text-white flex items-center justify-center shrink-0 shadow-sm">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </div>
         );
       case "warning":
         return (
-          <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <div className="w-7 h-7 rounded-[9px] bg-[#FF9500] text-white flex items-center justify-center shrink-0 shadow-sm">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
         );
       case "info":
         return (
-          <div className="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="w-7 h-7 rounded-[9px] bg-black text-white flex items-center justify-center shrink-0 shadow-sm">
+            {/* Embedded Mini Dynamic Path Logo for Brand Info Alert */}
+            <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="6" cy="18" r="1.5" className="fill-white" />
+              <path d="M6 18C6 12 18 12 18 6" />
+              <circle cx="18" cy="6" r="1.5" className="fill-white" />
             </svg>
           </div>
         );
-    }
-  };
-
-  const getProgressBarColor = () => {
-    switch (toast.type) {
-      case "success":
-        return "bg-emerald-500";
-      case "error":
-        return "bg-red-500";
-      case "warning":
-        return "bg-amber-500";
-      case "info":
-        return "bg-blue-500";
     }
   };
 
@@ -143,60 +136,47 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       className={`
         pointer-events-auto
         w-full
-        bg-black/90
-        backdrop-blur-md
+        bg-white/95
+        backdrop-blur-xl
         border
-        border-white/10
-        rounded-2xl
-        shadow-2xl
-        overflow-hidden
-        relative
+        border-black/[0.04]
+        rounded-[16px]
+        p-3.5
         flex
-        gap-3.5
-        p-4
+        items-start
+        gap-3
         transition-all
         duration-300
-        ${isExiting ? "opacity-0 translate-y-2 scale-95" : "opacity-100 translate-y-0 scale-100 animate-slide-in"}
+        ease-[cubic-bezier(0.16,1,0.3,1)]
+        shadow-[0_12px_30px_rgba(0,0,0,0.04),0_2px_4px_rgba(0,0,0,0.02)]
+        ${isExiting ? "opacity-0 -translate-y-4 scale-95" : "opacity-100 translate-y-0 scale-100 animate-slide-down"}
       `}
-      style={{
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)",
-      }}
     >
-      {/* Type Icon */}
+      {/* Dynamic Type Vector Indicator */}
       {getIcon()}
 
-      {/* Content */}
-      <div className="flex-1 min-w-0 pr-6 select-none">
-        <h4 className="text-sm font-semibold tracking-tight text-white leading-tight">
+      {/* Copy Workspace */}
+      <div className="flex-1 min-w-0 pr-4 select-none pt-0.5">
+        <h4 className="text-[13px] font-semibold tracking-tight text-black leading-tight">
           {toast.title}
         </h4>
         {toast.message && (
-          <p className="text-xs text-white/60 font-medium leading-normal mt-1">
+          <p className="text-[12px] font-medium text-black/45 leading-normal mt-0.5 tracking-tight">
             {toast.message}
           </p>
         )}
       </div>
 
-      {/* Close Action */}
+      {/* Dismiss Trigger */}
       <button
         onClick={handleClose}
-        className="absolute top-4 right-4 text-white/30 hover:text-white transition duration-200"
+        className="w-5 h-5 rounded-full flex items-center justify-center text-black/20 hover:text-black/50 transition-colors duration-150 mt-0.5 shrink-0"
         aria-label="Dismiss toast"
       >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
-
-      {/* Progress countdown bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/10 overflow-hidden">
-        <div
-          className={`h-full ${getProgressBarColor()}`}
-          style={{
-            animation: `toast-progress-countdown ${toast.duration || 5000}ms linear forwards`,
-          }}
-        />
-      </div>
     </div>
   );
 }
