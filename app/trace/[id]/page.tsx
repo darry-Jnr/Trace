@@ -7,15 +7,14 @@ import {
   Map,
   Mountain,
   Plus,
-  Type,
-  Image as ImageIcon,
-  Mic,
+  MessageSquareMore,
+  Camera,
+  AudioWaveform,
   X,
-  MapPin,
-  Calendar,
-  Compass
+  Play
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import SaveReviewModal from "./components/SaveReviewModal";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -24,8 +23,10 @@ type ViewMode = "flat" | "tilted";
 type MediaModalType = "text" | "image" | "voice" | null;
 
 interface WaypointMedia {
+  id: string;
   type: "text" | "image" | "voice";
   content: string;
+  category: string;
   coordinates: [number, number];
 }
 
@@ -69,6 +70,9 @@ export default function TraceWorkspacePage() {
   const [mediaModal, setMediaModal] = useState<MediaModalType>(null);
   const [mediaInputText, setMediaInputText] = useState("");
   const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
+  
+  // Track currently active inspected waypoint card popping up from below
+  const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
   
   // Save flow review states
   const [showSaveReview, setShowSaveReview] = useState(false);
@@ -115,7 +119,7 @@ export default function TraceWorkspacePage() {
     prepareMap();
   }, []);
 
-  // Mapbox Canvas Instance Build with Streets-v12 Real World Layers
+  // Mapbox Canvas Instance Build
   useEffect(() => {
     if (!baseLocation || !mapRef.current || mapInstanceRef.current) return;
 
@@ -134,14 +138,14 @@ export default function TraceWorkspacePage() {
       pitch: 0,
       bearing: 0,
       antialias: true,
+      attributionControl: false, // REMOVES THE ATTRIBUTION INFO FROM THE BOTTOM
     });
 
     map.on("style.load", () => {
-      // Atmospheric fog configuration tailored for streets-v12 pastel horizons
       map.setFog({
-        color: "rgb(230, 240, 255)",        // Soft sky blue horizon tint
-        "high-color": "rgb(255, 255, 255)", // Crisp clean space blend
-        "horizon-blend": 0.03,              // Smooth gradient feathering
+        color: "rgb(230, 240, 255)",
+        "high-color": "rgb(255, 255, 255)",
+        "horizon-blend": 0.03,
       });
 
       map.addSource("recording-trail-source", {
@@ -159,17 +163,15 @@ export default function TraceWorkspacePage() {
         source: "recording-trail-source",
         layout: { "line-join": "round", "line-cap": "round" },
         paint: { 
-          "line-color": "#0052FF", // High-visibility premium tracking blue route vector line
+          "line-color": "#0052FF",
           "line-width": 5.5, 
           "line-opacity": 0.95 
         },
       });
     });
 
-    // Custom brand pin anchor highlighting active telemetry position
     const el = document.createElement("div");
     el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-4 border-white shadow-[0_2px_10px_rgba(0,82,255,0.4)] flex items-center justify-center relative";
-    // Wave pulse visual context indicator
     el.innerHTML = `<span class="absolute inset-0 rounded-full bg-[#0052FF]/30 animate-ping scale-150 pointer-events-none" style="animation-duration: 2s;" />`;
 
     const userMarker = new mapboxgl.Marker({ element: el })
@@ -332,28 +334,48 @@ export default function TraceWorkspacePage() {
     const placementCoords = userLocationRef.current;
     if (!placementCoords || !mapInstanceRef.current) return;
 
+    const categoryMapping = {
+      text: "HELPING GUESTS FIND YOUR HOUSE",
+      image: "RUNNING WITH FRIENDS",
+      voice: "FINDING FRIENDS IN A CROWD"
+    };
+
+    const newMediaId = `wp-${Date.now()}`;
     const newMedia: WaypointMedia = {
+      id: newMediaId,
       type: mediaModal!,
-      content: mediaModal === "text" ? mediaInputText : `Hardware attached ${mediaModal} capture data`,
+      content: mediaModal === "text" ? mediaInputText : mediaModal === "voice" ? `"I'm near the left speaker tower. Walk straight past the food stands."` : "Construction ahead. Cross to the right side of the street here.",
+      category: categoryMapping[mediaModal!],
       coordinates: placementCoords,
     };
 
     setSavedMedia((prev) => [...prev, newMedia]);
 
     const customMediaEl = document.createElement("div");
-    customMediaEl.className = "w-8 h-8 rounded-[10px] bg-[#0052FF] text-white border-2 border-white shadow-[0_4px_12px_rgba(0,82,255,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95";
+    customMediaEl.className = "w-8 h-8 rounded-[10px] bg-black text-white border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95 z-30";
     
-    let innerIcon = "Txt";
-    if (mediaModal === "image") innerIcon = "Img";
-    if (mediaModal === "voice") innerIcon = "Voc";
-    customMediaEl.innerHTML = `<span class="text-[10px] font-bold tracking-tight">${innerIcon}</span>`;
+    let innerIconHtml = '';
+    if (mediaModal === "text") {
+      innerIconHtml = `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+    } else if (mediaModal === "image") {
+      innerIconHtml = `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`;
+    } else if (mediaModal === "voice") {
+      innerIconHtml = `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>`;
+    }
+
+    customMediaEl.innerHTML = innerIconHtml;
+
+    customMediaEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setActiveWaypoint(newMedia);
+      mapInstanceRef.current?.easeTo({
+        center: placementCoords,
+        duration: 600
+      });
+    });
 
     new mapboxgl.Marker({ element: customMediaEl })
       .setLngLat(placementCoords)
-      .setPopup(
-        new mapboxgl.Popup({ offset: 14, closeButton: false })
-          .setHTML(`<p class="px-2.5 py-1.5 text-xs text-black font-semibold tracking-tight">${newMedia.content}</p>`)
-      )
       .addTo(mapInstanceRef.current);
 
     setMediaInputText("");
@@ -361,13 +383,11 @@ export default function TraceWorkspacePage() {
     setIsAddMenuOpen(false);
   };
 
-  // Triggers the full-screen review canvas on tracking completion
   const handleStopRecordingFlow = () => {
     setIsRecording(false);
     setShowSaveReview(true);
   };
 
-  // Pushes success toast alert, routes back to home dashboard workspace
   const handleCommitSaveTrace = () => {
     setShowSaveReview(false);
     toast.success("Trace Saved Successfully", `"${traceTitleInput}" has been safely archived in your dashboard workspace.`);
@@ -382,15 +402,78 @@ export default function TraceWorkspacePage() {
   }[loadingStage];
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#f5f5f7] font-sans selection:bg-black selection:text-white">
-      {/* Mapbox Canvas Surface Viewport */}
-      <div ref={mapRef} className="w-full h-full z-0" />
+    <div className="relative flex w-screen h-screen overflow-hidden bg-[#f5f5f7] font-sans selection:bg-black selection:text-white">
+      {/* Map Section - Targets mapbox defaults cleanly via deep utility styling hidden state */}
+      <div className="relative flex-1 h-full min-w-0 transition-all duration-300 z-0 [&_.mapboxgl-ctrl-logo]:hidden [&_.mapboxgl-ctrl-attrib]:hidden">
+        <div ref={mapRef} className="w-full h-full" onClick={() => setActiveWaypoint(null)} />
+
+      {/* Waypoint Sheet - Pops Up From Below */}
+      {activeWaypoint && (
+        <div className="absolute inset-x-0 bottom-0 z-50 flex justify-center p-4 md:pb-6 pointer-events-none">
+          <div className="bg-white/95 backdrop-blur-xl w-full md:max-w-md rounded-[28px] border border-black/[0.04] shadow-[0_-10px_40px_rgba(0,0,0,0.06),0_20px_50px_rgba(0,0,0,0.1)] p-6 relative pointer-events-auto animate-slide-up-sheet overflow-hidden">
+            
+            {/* Cancel/Close Button Top Right */}
+            <button 
+              onClick={() => setActiveWaypoint(null)} 
+              className="absolute top-4 right-4 text-black/30 hover:text-black w-6 h-6 flex items-center justify-center rounded-full bg-black/[0.03] transition-colors"
+            >
+              <X className="w-3.5 h-3.5 stroke-[2.5]" />
+            </button>
+
+            {/* Sub-Header Designation */}
+            <span className="text-[10px] font-bold tracking-wider text-black/40 uppercase block mb-2.5">
+              {activeWaypoint.category}
+            </span>
+
+            {/* Dynamic Layout Content Render blocks */}
+            {activeWaypoint.type === "text" && (
+              <div className="bg-black/[0.01] border border-black/[0.04] rounded-[16px] p-4">
+                <p className="text-sm font-medium text-black/80 tracking-tight leading-relaxed">
+                  {activeWaypoint.content}
+                </p>
+              </div>
+            )}
+
+            {activeWaypoint.type === "image" && (
+              <div className="space-y-3.5">
+                <div className="w-full aspect-[16/10] bg-black/[0.03] border border-black/[0.05] rounded-[20px] flex flex-col items-center justify-center text-black/20">
+                  <Camera className="w-8 h-8 stroke-[1.5] mb-1" />
+                  <span className="text-[10px] font-semibold tracking-tight text-black/35">Asset Snapshot Layer</span>
+                </div>
+                <p className="text-sm font-medium text-black/80 tracking-tight px-0.5">
+                  {activeWaypoint.content}
+                </p>
+              </div>
+            )}
+
+            {activeWaypoint.type === "voice" && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium text-black/80 italic tracking-tight leading-relaxed">
+                  {activeWaypoint.content}
+                </p>
+                <div className="flex items-center gap-3 bg-black/[0.02] border border-black/[0.04] rounded-[18px] p-3">
+                  <button className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center shadow-sm active:scale-95 transition-transform shrink-0">
+                    <Play className="w-4 h-4 fill-white ml-0.5" />
+                  </button>
+                  <div className="flex items-center gap-[3px] h-6 flex-1 opacity-25">
+                    {[2, 4, 3, 6, 2, 5, 4, 7, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 5, 2, 4].map((val, i) => (
+                      <div 
+                        key={i} 
+                        className="bg-black rounded-full flex-1" 
+                        style={{ height: `${val * 12}%` }} 
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Control Deck Overlay Panel */}
       {!isLoading && userLocation && (
         <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3 items-center">
-          
-          {/* View Mode Node Toggle */}
           <button
             onClick={toggleView}
             className="w-14 h-14 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl border border-black/[0.04] rounded-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] active:scale-[0.96] transition-all group"
@@ -405,7 +488,6 @@ export default function TraceWorkspacePage() {
             </span>
           </button>
 
-          {/* Core Recording Stream Action Trigger */}
           <button
             onClick={isRecording ? handleStopRecordingFlow : () => setIsRecording(true)}
             className={`w-14 h-14 flex flex-col items-center justify-center rounded-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] active:scale-[0.96] transition-all ${
@@ -420,7 +502,6 @@ export default function TraceWorkspacePage() {
             </span>
           </button>
 
-          {/* Layer Asset Deployment Node Cluster Drawer */}
           {isRecording && (
             <div className="flex flex-col gap-2 items-center mt-2 pt-2 border-t border-black/[0.05]">
               <button
@@ -434,7 +515,6 @@ export default function TraceWorkspacePage() {
                 <Plus className="w-5 h-5 stroke-[2.5]" />
               </button>
 
-              {/* Nested Drawer Triggers */}
               {isAddMenuOpen && (
                 <div className="flex flex-col gap-2 p-1.5 bg-white/95 backdrop-blur-xl rounded-[18px] border border-black/[0.04] shadow-md animate-fade-in-up">
                   <button 
@@ -442,21 +522,21 @@ export default function TraceWorkspacePage() {
                     className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95"
                     title="Add Text Note"
                   >
-                    <Type className="w-4 h-4" />
+                    <MessageSquareMore className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => setMediaModal("image")} 
                     className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95"
                     title="Attach Photo"
                   >
-                    <ImageIcon className="w-4 h-4" />
+                    <Camera className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => setMediaModal("voice")} 
                     className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95"
                     title="Record Audio"
                   >
-                    <Mic className="w-4 h-4" />
+                    <AudioWaveform className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -467,8 +547,8 @@ export default function TraceWorkspacePage() {
 
       {/* Media Input Drawer Submodal */}
       {mediaModal && (
-        <div className="absolute inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[26px] border border-black/[0.04] shadow-[0_24px_60px_rgba(0,0,0,0.08)] p-6 w-full max-w-sm relative animate-scale-up">
+        <div className="absolute inset-0 bg-black/15 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300">
+          <div className="bg-white w-full md:max-w-sm rounded-t-[32px] md:rounded-[28px] border-t md:border border-black/[0.04] shadow-[0_-8px_30px_rgba(0,0,0,0.06),0_24px_60px_rgba(0,0,0,0.08)] p-6 pb-10 md:pb-6 relative animate-slide-up-sheet md:animate-scale-up-modal overflow-hidden">
             <button 
               onClick={() => setMediaModal(null)} 
               className="absolute top-4 right-4 text-black/30 hover:text-black w-6 h-6 flex items-center justify-center rounded-full bg-black/[0.03]"
@@ -477,9 +557,9 @@ export default function TraceWorkspacePage() {
             </button>
             
             <h3 className="text-sm font-semibold tracking-tight text-black capitalize mb-4 flex items-center gap-2">
-              {mediaModal === "text" && <Type className="w-4 h-4 text-[#0052FF]" />}
-              {mediaModal === "image" && <ImageIcon className="w-4 h-4 text-[#0052FF]" />}
-              {mediaModal === "voice" && <Mic className="w-4 h-4 text-[#0052FF]" />}
+              {mediaModal === "text" && <MessageSquareMore className="w-4 h-4 text-[#0052FF]" />}
+              {mediaModal === "image" && <Camera className="w-4 h-4 text-[#0052FF]" />}
+              {mediaModal === "voice" && <AudioWaveform className="w-4 h-4 text-[#0052FF]" />}
               Attach {mediaModal} Point
             </h3>
 
@@ -507,100 +587,18 @@ export default function TraceWorkspacePage() {
         </div>
       )}
 
-      {/* Premium Full-Screen Trace Review Canvas (Triggered on Session Stop) */}
-      {showSaveReview && (
-        <div className="absolute inset-0 bg-[#f5f5f7] z-50 flex flex-col animate-slide-up select-none">
-          
-          {/* Header Action Row Bar */}
-          <header className="h-20 w-full px-6 flex items-center justify-between bg-white border-b border-black/[0.04]">
-            <button 
-              onClick={() => setShowSaveReview(false)}
-              className="w-10 h-10 rounded-[12px] bg-black/[0.03] hover:bg-black/[0.06] text-black/70 flex items-center justify-center transition-all active:scale-95"
-              aria-label="Close review"
-            >
-              <X className="w-[18px] h-[18px] stroke-[2.5]" />
-            </button>
-            <span className="text-xs font-bold uppercase tracking-widest text-black/40">
-              Review Map Trace
-            </span>
-            <div className="w-10 h-10 opacity-0 pointer-events-none" /> {/* Alignment Spacer */}
-          </header>
+      </div>
 
-          {/* Full Screen Interactive Snapshot Panel Layout Box */}
-          <div className="flex-1 max-w-md w-full mx-auto px-6 flex flex-col justify-center gap-8 py-10">
-            
-            {/* Synthetic Vector Map Snapshot Graphic Frame Component */}
-            <div className="w-full aspect-[4/3] bg-white rounded-[28px] border border-black/[0.04] shadow-[0_12px_40px_rgba(0,0,0,0.02)] relative overflow-hidden flex items-center justify-center p-6 group">
-              {/* Dot Grid Background representation */}
-              <div className="absolute inset-0 bg-[radial-gradient(#0052FF_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.06]" />
-              
-              {/* Captured Route Track Line Art */}
-              <svg className="w-48 h-24 text-black/[0.08]" viewBox="0 0 200 100" fill="none" stroke="currentColor" strokeWidth={4}>
-                <path 
-                  d="M 20 75 C 40 40, 80 90, 120 40 C 140 20, 160 50, 180 35" 
-                  stroke="#0052FF" 
-                  strokeLinecap="round" 
-                  strokeWidth={4.5}
-                />
-                <g transform="translate(180, 35)">
-                  <circle cx="0" cy="0" r="4" fill="#0052FF" />
-                </g>
-              </svg>
-
-              {/* Waypoint count badge pins overview */}
-              <div className="absolute bottom-4 left-4 flex gap-1.5">
-                <span className="px-2 py-1 rounded-[8px] bg-black text-white text-[9px] font-bold tracking-tight">
-                  {savedMedia.length} Waypoints
-                </span>
-                <span className="px-2 py-1 rounded-[8px] bg-black/[0.04] text-black/50 text-[9px] font-bold tracking-tight">
-                  {pathCoordsRef.current.length > 0 ? "0.2 mi" : "0.0 mi"}
-                </span>
-              </div>
-              <Compass className="absolute top-4 right-4 w-4 h-4 text-black/20" />
-            </div>
-
-            {/* Metatext Data Configuration Panel Details */}
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-black/40 block mb-1.5 px-1">
-                  Trace Identifier Title
-                </label>
-                <input 
-                  type="text"
-                  value={traceTitleInput}
-                  onChange={(e) => setTraceTitleInput(e.target.value)}
-                  className="w-full h-12 px-4 bg-white border border-black/10 rounded-[16px] text-sm font-semibold text-black focus:outline-none focus:border-[#0052FF] shadow-sm transition-all"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="bg-white border border-black/[0.03] p-3.5 rounded-[16px] flex items-center gap-3">
-                  <MapPin className="w-4 h-4 text-[#0052FF] shrink-0" />
-                  <div className="leading-none">
-                    <span className="text-[9px] font-bold text-black/35 block uppercase tracking-tight">Coordinates</span>
-                    <span className="text-xs font-bold text-black block mt-0.5">Vector Set</span>
-                  </div>
-                </div>
-                <div className="bg-white border border-black/[0.03] p-3.5 rounded-[16px] flex items-center gap-3">
-                  <Calendar className="w-4 h-4 text-[#0052FF] shrink-0" />
-                  <div className="leading-none">
-                    <span className="text-[9px] font-bold text-black/35 block uppercase tracking-tight">Timestamp</span>
-                    <span className="text-xs font-bold text-black block mt-0.5">Just Now</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Save Action Button */}
-            <button
-              onClick={handleCommitSaveTrace}
-              className="w-full h-12 rounded-[16px] bg-black text-white text-sm font-semibold tracking-tight shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center mt-2"
-            >
-              Save & Publish Trail Link
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Premium Full-Screen Trace Review Canvas */}
+      <SaveReviewModal
+        isOpen={showSaveReview}
+        onClose={() => setShowSaveReview(false)}
+        title={traceTitleInput}
+        onTitleChange={setTraceTitleInput}
+        waypointCount={savedMedia.length}
+        distance={pathCoordsRef.current.length > 0 ? "0.2 mi" : "0.0 mi"}
+        onSave={handleCommitSaveTrace}
+      />
 
       {/* Screen Initial Setup Setup Overlay Loader */}
       {isLoading && (
