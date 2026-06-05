@@ -70,7 +70,7 @@ export default function TraceWorkspacePage() {
   const [mediaInputText, setMediaInputText] = useState("");
   const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
   
-  // Save flow view states
+  // Save flow review states
   const [showSaveReview, setShowSaveReview] = useState(false);
   const [traceTitleInput, setTraceTitleInput] = useState("Unfinished Trail Trace");
 
@@ -115,7 +115,7 @@ export default function TraceWorkspacePage() {
     prepareMap();
   }, []);
 
-  // Mapbox Canvas Instance Build
+  // Mapbox Canvas Instance Build with Streets-v12 Real World Layers
   useEffect(() => {
     if (!baseLocation || !mapRef.current || mapInstanceRef.current) return;
 
@@ -128,7 +128,7 @@ export default function TraceWorkspacePage() {
 
     const map = new mapboxgl.Map({
       container: mapRef.current,
-      style: "mapbox://styles/mapbox/light-v11",
+      style: "mapbox://styles/mapbox/streets-v12",
       center: baseLocation,
       zoom: hasCache ? 17 : 14,
       pitch: 0,
@@ -137,10 +137,11 @@ export default function TraceWorkspacePage() {
     });
 
     map.on("style.load", () => {
+      // Atmospheric fog configuration tailored for streets-v12 pastel horizons
       map.setFog({
-        color: "rgb(245, 245, 247)",
-        "high-color": "rgb(255, 255, 255)",
-        "horizon-blend": 0.02,
+        color: "rgb(230, 240, 255)",        // Soft sky blue horizon tint
+        "high-color": "rgb(255, 255, 255)", // Crisp clean space blend
+        "horizon-blend": 0.03,              // Smooth gradient feathering
       });
 
       map.addSource("recording-trail-source", {
@@ -360,13 +361,13 @@ export default function TraceWorkspacePage() {
     setIsAddMenuOpen(false);
   };
 
-  // Triggers the beautiful full-screen review canvas
+  // Triggers the full-screen review canvas on tracking completion
   const handleStopRecordingFlow = () => {
     setIsRecording(false);
     setShowSaveReview(true);
   };
 
-  // Commits details, pushes success toast notification, sends user home
+  // Pushes success toast alert, routes back to home dashboard workspace
   const handleCommitSaveTrace = () => {
     setShowSaveReview(false);
     toast.success("Trace Saved Successfully", `"${traceTitleInput}" has been safely archived in your dashboard workspace.`);
@@ -590,7 +591,7 @@ export default function TraceWorkspacePage() {
               </div>
             </div>
 
-            {/* Bottom Form Submission Controller Save Action Button */}
+            {/* Bottom Save Action Button */}
             <button
               onClick={handleCommitSaveTrace}
               className="w-full h-12 rounded-[16px] bg-black text-white text-sm font-semibold tracking-tight shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center mt-2"
