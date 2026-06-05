@@ -14,9 +14,17 @@ interface TraceCardProps {
 
 const TraceCard = ({ title, link, date, isRecent = false, onShare, onClick }: TraceCardProps) => {
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`w-full flex items-center justify-between p-5 rounded-[24px] border border-black/[0.05] transition-all
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      className={`w-full flex items-center justify-between p-5 rounded-[24px] border border-black/[0.05] transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-black/25
         ${isRecent ? "bg-[#efefec]" : "bg-white"}
         hover:border-black/10 active:scale-[0.99]`}
     >
@@ -46,7 +54,7 @@ const TraceCard = ({ title, link, date, isRecent = false, onShare, onClick }: Tr
       >
         <CornerUpRight className="w-4 h-4" /> {/* Now matches image_2320bd.png */}
       </button>
-    </button>
+    </div>
   );
 };
 

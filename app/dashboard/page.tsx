@@ -1,7 +1,7 @@
 "use client";
 
-import Navbar from "./components/Navbar";
-import Main from "./components/Main";
+import Navbar from "@/components/dashboard/Navbar";
+import Main from "@/components/dashboard/Main";
 
 const Dashboard = () => {
   return (
