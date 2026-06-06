@@ -7,10 +7,13 @@ import { ViewMode, WaypointMedia, CACHE_KEY } from "@/types";
 export function useMapEngine(
   mapRef: React.RefObject<HTMLDivElement | null>,
   baseLocation: [number, number] | null,
-  onWaypointSelect: (waypoint: WaypointMedia) => void
+  onWaypointSelect: (waypoint: WaypointMedia) => void,
+  trailCoordinates: [number, number][] = [],
+  savedMedia: WaypointMedia[] = []
 ) {
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const injectedMarkerIds = useRef<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
 
   // Mount Instance Mapbox Canvas
@@ -69,10 +72,12 @@ export function useMapEngine(
     mapInstanceRef.current = map;
     userMarkerRef.current = userMarker;
 
+    const markerCache = injectedMarkerIds.current;
     return () => {
       if (userMarkerRef.current) userMarkerRef.current.remove();
       map.remove();
       mapInstanceRef.current = null;
+      markerCache.clear();
     };
   }, [baseLocation, mapRef]);
 
@@ -134,6 +139,44 @@ export function useMapEngine(
 
     new mapboxgl.Marker({ element: el }).setLngLat(waypoint.coordinates).addTo(map);
   };
+
+  // Sync vector path trail to Mapbox source layer automatically on updates
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const applyPath = () => {
+      updateVectorPath(trailCoordinates);
+    };
+
+    if (map.isStyleLoaded()) {
+      applyPath();
+    } else {
+      map.once("style.load", applyPath);
+    }
+  }, [trailCoordinates]);
+
+  // Sync waypoint DOM markers to Mapbox map dynamically on updates
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const applyWaypoints = () => {
+      savedMedia.forEach((waypoint) => {
+        if (!injectedMarkerIds.current.has(waypoint.id)) {
+          injectDOMMarker(waypoint);
+          injectedMarkerIds.current.add(waypoint.id);
+        }
+      });
+    };
+
+    if (map.isStyleLoaded()) {
+      applyWaypoints();
+    } else {
+      map.once("style.load", applyWaypoints);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedMedia]);
 
   return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, injectDOMMarker };
 }

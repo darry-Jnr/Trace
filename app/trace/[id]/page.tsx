@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import SaveReviewModal from "@/components/trace/SaveReviewModal";
 
@@ -18,6 +18,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 export default function TraceWorkspacePage() {
   const router = useRouter();
+  const params = useParams();
+  const id = params?.id as string;
   const toast = useToast();
   const mapRef = useRef<HTMLDivElement>(null);
 
@@ -29,39 +31,106 @@ export default function TraceWorkspacePage() {
   const [showSaveReview, setShowSaveReview] = useState(false);
   const [traceTitleInput, setTraceTitleInput] = useState("Unfinished Trail Trace");
   const [trailCoordinates, setTrailCoordinates] = useState<[number, number][]>([]);
+  const [isReplayMode, setIsReplayMode] = useState(false);
+  const [replayBaseLocation, setReplayBaseLocation] = useState<[number, number] | null>(null);
+  const [traceDistance, setTraceDistance] = useState("0.0 mi");
+
+  // --- 1. LIFE CYCLE SYSTEM: READ LOCAL STORAGE VS GENERATE FRESH ---
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const stored = localStorage.getItem("saved_traces");
+      if (stored) {
+        const traces = JSON.parse(stored);
+        const savedTrace = traces.find((t: { id: string }) => t.id === id);
+
+        if (savedTrace) {
+          // SCENARIO A: Found existing track file records in client database
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setIsReplayMode(true);
+          setTraceTitleInput(savedTrace.title);
+          if (savedTrace.coordinates && savedTrace.coordinates.length > 0) {
+            setTrailCoordinates(savedTrace.coordinates);
+            setReplayBaseLocation(savedTrace.coordinates[0]);
+          }
+          if (savedTrace.waypoints) {
+            setSavedMedia(savedTrace.waypoints);
+          }
+          if (savedTrace.distance) {
+            setTraceDistance(savedTrace.distance);
+          }
+          setShowSaveReview(true);
+          return;
+        }
+      }
+
+      // SCENARIO B: Brand new URL identifier link. Ready input states
+      setIsReplayMode(false);
+      setShowSaveReview(false);
+      setTrailCoordinates([]);
+      setSavedMedia([]);
+      setTraceTitleInput("Fresh Location Trace");
+    } catch (e) {
+      console.error("Error evaluating trace context state:", e);
+    }
+  }, [id]);
 
   // Engine Connection #2: Hardware device telemetry location tracking engine
-  // Note: handleLocationStream / updateVectorPath are used in these callbacks before their textual declaration.
-  // This is safe because useGPSTracker stores callbacks in stable refs and only invokes them from async GPS
-  // watchPosition callbacks — never synchronously during render.
-  const { baseLocation, userLocation, isLoading, loadingStage } = useGPSTracker(
-    isRecording,
-    // eslint-disable-next-line react-hooks/immutability
-    (coords: [number, number]) => handleLocationStream(coords, null),
+  // CRITICAL FIX: The GPS tracker is now allowed to run when idle to query the user's initial anchor dot frame
+  const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage } = useGPSTracker(
+    !isReplayMode, // Keeps checking GPS to display your real dot context cleanly
+    (coords: [number, number]) => {
+      if (!isReplayMode && isRecording) {
+        // eslint-disable-next-line react-hooks/immutability
+        handleLocationStream(coords, null);
+      }
+    },
     (updatedPath: [number, number][]) => {
-      setTrailCoordinates(updatedPath);
-      // eslint-disable-next-line react-hooks/immutability
-      updateVectorPath(updatedPath);
+      if (!isReplayMode && isRecording) {
+        setTrailCoordinates(updatedPath);
+        // eslint-disable-next-line react-hooks/immutability
+        updateVectorPath(updatedPath);
+      }
     }
   );
 
   // Engine Connection #1: Mapbox canvas lifecycle engine
-  const { 
-    viewMode, 
-    toggleViewPerspective, 
-    handleLocationStream, 
-    updateVectorPath, 
-    injectDOMMarker 
-  } = useMapEngine(mapRef, baseLocation, setActiveWaypoint);
+  const {
+    viewMode,
+    toggleViewPerspective,
+    handleLocationStream,
+    updateVectorPath,
+    injectDOMMarker
+  } = useMapEngine(
+    mapRef,
+    isReplayMode ? replayBaseLocation : baseLocation,
+    setActiveWaypoint,
+    trailCoordinates,
+    savedMedia
+  );
 
+  // Sync historical pins dynamically into the Canvas Map when Replay view opens
+  useEffect(() => {
+    if (isReplayMode && savedMedia.length > 0) {
+      savedMedia.forEach(marker => injectDOMMarker(marker));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReplayMode, savedMedia]);
+
+  // Fallback fallback pointer coordinate interceptor
+  const getCurrentCapturePoint = () => {
+    return userLocation || baseLocation || trailCoordinates[trailCoordinates.length - 1] || [37.7749, -122.4194];
+  };
+
+  // --- INTERACTION INLINE DATA DISPATCHERS ---
   const handleSaveTextMarker = (text: string) => {
-    if (!userLocation) return;
+    const targetCoords = getCurrentCapturePoint();
     const newMedia: WaypointMedia = {
       id: `wp-${Date.now()}`,
       type: "text",
       content: text,
       category: "HELPING GUESTS FIND YOUR HOUSE",
-      coordinates: userLocation,
+      coordinates: targetCoords,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     injectDOMMarker(newMedia);
@@ -69,13 +138,13 @@ export default function TraceWorkspacePage() {
   };
 
   const handleSaveAudioMarker = (audioBlob: Blob, durationSec: number) => {
-    if (!userLocation) return;
+    const targetCoords = getCurrentCapturePoint();
     const newMedia: WaypointMedia = {
       id: `wp-${Date.now()}`,
       type: "voice",
       content: `Voice Memo (${durationSec}s)`,
       category: "FINDING FRIENDS IN A CROWD",
-      coordinates: userLocation,
+      coordinates: targetCoords,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     injectDOMMarker(newMedia);
@@ -83,13 +152,13 @@ export default function TraceWorkspacePage() {
   };
 
   const handleSavePhotoMarker = (imageDataUrl: string) => {
-    if (!userLocation) return;
+    const targetCoords = getCurrentCapturePoint();
     const newMedia: WaypointMedia = {
       id: `wp-${Date.now()}`,
       type: "image",
       content: imageDataUrl,
       category: "RUNNING WITH FRIENDS",
-      coordinates: userLocation,
+      coordinates: targetCoords,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     injectDOMMarker(newMedia);
@@ -108,10 +177,47 @@ export default function TraceWorkspacePage() {
 
   const handleCommitSaveTrace = () => {
     setShowSaveReview(false);
+
+    try {
+      const stored = localStorage.getItem("saved_traces");
+      const savedTraces = stored ? JSON.parse(stored) : [];
+      const dateString = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+      const newTrace = {
+        id: id, // Explicitly binds to the exact dynamic folder token link inside address bar
+        title: traceTitleInput || "Unfinished Trail Trace",
+        link: `${window.location.origin}/trace/${id}`,
+        date: dateString,
+        coordinates: trailCoordinates,
+        waypoints: savedMedia,
+        distance: trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi",
+      };
+
+      const existingIndex = savedTraces.findIndex((t: { id: string }) => t.id === newTrace.id);
+      if (existingIndex > -1) {
+        savedTraces[existingIndex] = newTrace;
+      } else {
+        savedTraces.unshift(newTrace);
+      }
+
+      localStorage.setItem("saved_traces", JSON.stringify(savedTraces));
+    } catch (e) {
+      console.error("Error saving trace to localStorage:", e);
+    }
+
     toast.success("Trace Saved Successfully", `"${traceTitleInput}" has been safely archived.`);
     router.push("/dashboard");
   };
 
+  const handleCloseSaveReview = () => {
+    if (isReplayMode) {
+      router.push("/dashboard");
+    } else {
+      setShowSaveReview(false);
+    }
+  };
+
+  // --- LOADER CONFIGURATION DIALS ---
   const loadingMessage = {
     booting: "Preparing workspace",
     searching: "Finding nearby position",
@@ -119,15 +225,22 @@ export default function TraceWorkspacePage() {
     done: "Location connected",
   }[loadingStage];
 
+  const showInitialLoader = isReplayMode ? !replayBaseLocation : gpsLoading;
+  const loadingMessageStr = isReplayMode ? "Loading saved trace..." : loadingMessage;
+
   return (
     <div className="relative flex w-screen h-screen overflow-hidden bg-[#f5f5f7] font-sans selection:bg-black selection:text-white">
       <div className="relative flex-1 h-full min-w-0 transition-all duration-300 z-0 [&_.mapboxgl-ctrl-logo]:hidden [&_.mapboxgl-ctrl-attrib]:hidden">
-        
+
+        {/* BACKDROP INTERACTIVE CANVAS ENGINE */}
         <MapCanvas mapRef={mapRef} onClearActive={() => setActiveWaypoint(null)} />
-        
+
+        {/* SIDE DRAWER MARKER NODE SHEETS */}
         <WaypointSheet activeWaypoint={activeWaypoint} onClose={() => setActiveWaypoint(null)} />
 
-        {!isLoading && userLocation && (
+        {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
+        {/* FIX: ControlDeck now stays open natively for tracking configurations if not reviewing past links */}
+        {!showInitialLoader && !isReplayMode && (
           <ControlDeck
             viewMode={viewMode}
             isRecording={isRecording}
@@ -142,18 +255,21 @@ export default function TraceWorkspacePage() {
         )}
       </div>
 
+      {/* VERIFICATION AND BACKUP REPLAY PANEL OVERLAY SUMMARY */}
       <SaveReviewModal
         isOpen={showSaveReview}
-        onClose={() => setShowSaveReview(false)}
+        onClose={handleCloseSaveReview}
         title={traceTitleInput}
         onTitleChange={setTraceTitleInput}
         waypointCount={savedMedia.length}
-        distance={trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi"}
+        distance={isReplayMode ? traceDistance : (trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi")}
         onSave={handleCommitSaveTrace}
         points={trailCoordinates}
+        isReadOnly={isReplayMode}
       />
 
-      <InitialLoader isLoading={isLoading} loadingMessage={loadingMessage} />
+      {/* BLOCKING HARDWARE LOADING TIMELINE MASK */}
+      <InitialLoader isLoading={showInitialLoader} loadingMessage={loadingMessageStr} />
     </div>
   );
 }
