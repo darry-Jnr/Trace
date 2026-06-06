@@ -1,1 +1,5 @@
-declare var pendo: any;
+declare global {
+  var pendo: unknown;
+}
+
+export {};

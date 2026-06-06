@@ -31,11 +31,14 @@ export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheet
         {activeWaypoint.type === "image" && (
           <div className="space-y-3.5">
             {activeWaypoint.content.startsWith("data:image/") ? (
-              <img
-                src={activeWaypoint.content}
-                alt="Captured Snapshot"
-                className="w-full aspect-[16/10] object-cover rounded-[20px] border border-black/[0.05]"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- data: URLs aren't supported by next/image */}
+                <img
+                  src={activeWaypoint.content}
+                  alt="Captured Snapshot"
+                  className="w-full aspect-[16/10] object-cover rounded-[20px] border border-black/[0.05]"
+                />
+              </>
             ) : (
               <>
                 <div className="w-full aspect-[16/10] bg-black/[0.03] border border-black/[0.05] rounded-[20px] flex flex-col items-center justify-center text-black/20">

@@ -75,20 +75,20 @@ function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast:
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const [isExiting, setIsExiting] = useState(false);
 
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose();
+    }, 200); // Fluid drop action timing
+  }, [onClose]);
+
   useEffect(() => {
     const autoDismissTimer = setTimeout(() => {
       handleClose();
     }, toast.duration || 4000);
 
     return () => clearTimeout(autoDismissTimer);
-  }, [toast.duration]);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onClose();
-    }, 200); // Fluid drop action timing
-  };
+  }, [toast.duration, handleClose]);
 
   // Custom cohesive brand vectors matching your system identity curves
   const getIcon = () => {

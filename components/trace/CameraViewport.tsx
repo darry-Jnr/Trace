@@ -14,22 +14,6 @@ export default function CameraViewport({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      console.error("Camera hardware pipeline access blocked:", err);
-      onClose();
-    }
-  };
-
   const captureSnapshot = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
@@ -46,12 +30,30 @@ export default function CameraViewport({
   };
 
   useEffect(() => {
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false,
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error("Camera hardware pipeline access blocked:", err);
+        onClose();
+      }
+    };
+
     startCamera();
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
+    // Camera starts once on mount; onClose is stable from parent
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

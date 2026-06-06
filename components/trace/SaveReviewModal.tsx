@@ -104,11 +104,14 @@ export default function SaveReviewModal({
               
               {/* 2. Real Map Backdrop Image Layer */}
               {mapSnapshotUrl ? (
-                <img 
-                  src={mapSnapshotUrl} 
-                  alt="Trace Path Route Snapshot" 
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external snapshot URL, next/image requires domain config */}
+                  <img 
+                    src={mapSnapshotUrl} 
+                    alt="Trace Path Route Snapshot" 
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                </>
               ) : (
                 /* Grid System Fallback if map image API isn't supplied yet */
                 <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 opacity-[0.03] bg-neutral-100">

@@ -137,7 +137,7 @@ export function useGPSTracker(
 
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify([rawLng, rawLat]));
-        } catch (e) { }
+        } catch { }
 
         // If bootstrap hasn't finished yet, GPS arriving first clears loading
         setLoadingStage("done");
@@ -160,5 +160,5 @@ export function useGPSTracker(
     // so this effect runs exactly once and the watch is never torn down.
   }, []);
 
-  return { baseLocation, userLocation, isLoading, loadingStage, pathCoords: pathCoordsRef.current };
+  return { baseLocation, userLocation, isLoading, loadingStage };
 }
