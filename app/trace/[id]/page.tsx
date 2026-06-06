@@ -7,12 +7,11 @@ import SaveReviewModal from "@/components/trace/SaveReviewModal";
 
 import { useGPSTracker } from "@/hooks/useGPSTracker";
 import { useMapEngine } from "@/hooks/useMapEngine";
-import { WaypointMedia, MediaModalType } from "@/types";
+import { WaypointMedia } from "@/types";
 
 import MapCanvas from "@/components/trace/MapCanvas";
 import ControlDeck from "@/components/trace/ControlDeck";
 import WaypointSheet from "@/components/trace/WaypointSheet";
-import MediaModal from "@/components/trace/MediaModal";
 import InitialLoader from "@/components/trace/InitialLoader";
 
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -25,8 +24,6 @@ export default function TraceWorkspacePage() {
   // Core UI Action Layout States
   const [isRecording, setIsRecording] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
-  const [mediaModal, setMediaModal] = useState<MediaModalType>(null);
-  const [mediaInputText, setMediaInputText] = useState("");
   const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
   const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
   const [showSaveReview, setShowSaveReview] = useState(false);
@@ -52,28 +49,45 @@ export default function TraceWorkspacePage() {
     injectDOMMarker 
   } = useMapEngine(mapRef, baseLocation, setActiveWaypoint);
 
-  const handleSaveMediaMarker = () => {
-    if (!userLocation || !mediaModal) return;
-
-    const categoryMapping: Record<"text" | "image" | "voice", string> = {
-      text: "HELPING GUESTS FIND YOUR HOUSE",
-      image: "RUNNING WITH FRIENDS",
-      voice: "FINDING FRIENDS IN A CROWD"
-    };
-
+  const handleSaveTextMarker = (text: string) => {
+    if (!userLocation) return;
     const newMedia: WaypointMedia = {
       id: `wp-${Date.now()}`,
-      type: mediaModal,
-      content: mediaModal === "text" ? mediaInputText : mediaModal === "voice" ? `"I'm near the left speaker tower. Walk straight past the food stands."` : "Construction ahead. Cross to the right side of the street here.",
-      category: categoryMapping[mediaModal],
+      type: "text",
+      content: text,
+      category: "HELPING GUESTS FIND YOUR HOUSE",
       coordinates: userLocation,
     };
-
     setSavedMedia((prev) => [...prev, newMedia]);
     injectDOMMarker(newMedia);
+    setIsAddMenuOpen(false);
+  };
 
-    setMediaInputText("");
-    setMediaModal(null);
+  const handleSaveAudioMarker = (audioBlob: Blob, durationSec: number) => {
+    if (!userLocation) return;
+    const newMedia: WaypointMedia = {
+      id: `wp-${Date.now()}`,
+      type: "voice",
+      content: `Voice Memo (${durationSec}s)`,
+      category: "FINDING FRIENDS IN A CROWD",
+      coordinates: userLocation,
+    };
+    setSavedMedia((prev) => [...prev, newMedia]);
+    injectDOMMarker(newMedia);
+    setIsAddMenuOpen(false);
+  };
+
+  const handleSavePhotoMarker = (imageDataUrl: string) => {
+    if (!userLocation) return;
+    const newMedia: WaypointMedia = {
+      id: `wp-${Date.now()}`,
+      type: "image",
+      content: imageDataUrl,
+      category: "RUNNING WITH FRIENDS",
+      coordinates: userLocation,
+    };
+    setSavedMedia((prev) => [...prev, newMedia]);
+    injectDOMMarker(newMedia);
     setIsAddMenuOpen(false);
   };
 
@@ -116,17 +130,11 @@ export default function TraceWorkspacePage() {
             onToggleView={toggleViewPerspective}
             onToggleRecord={handleToggleRecord}
             onToggleAddMenu={() => setIsAddMenuOpen(!isAddMenuOpen)}
-            onOpenMedia={setMediaModal}
+            onSendText={handleSaveTextMarker}
+            onAudioRecorded={handleSaveAudioMarker}
+            onPhotoCaptured={handleSavePhotoMarker}
           />
         )}
-
-        <MediaModal
-          mediaModal={mediaModal}
-          mediaInputText={mediaInputText}
-          onSetMediaInputText={setMediaInputText}
-          onClose={() => setMediaModal(null)}
-          onSave={handleSaveMediaMarker}
-        />
       </div>
 
       <SaveReviewModal
@@ -137,6 +145,7 @@ export default function TraceWorkspacePage() {
         waypointCount={savedMedia.length}
         distance={trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi"}
         onSave={handleCommitSaveTrace}
+        points={trailCoordinates}
       />
 
       <InitialLoader isLoading={isLoading} loadingMessage={loadingMessage} />

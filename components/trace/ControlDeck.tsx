@@ -1,7 +1,16 @@
 "use client";
 
-import { Map, Mountain, Plus, MessageSquareMore, Camera, AudioWaveform } from "lucide-react";
-import { ViewMode, MediaModalType } from "@/types";
+import React from "react";
+import {
+  Map,
+  Mountain,
+  Plus,
+  Square,
+  Circle,
+} from "lucide-react";
+
+import ActionDock from "./ActionDock";
+import { ViewMode } from "@/types";
 
 interface ControlDeckProps {
   viewMode: ViewMode;
@@ -10,7 +19,9 @@ interface ControlDeckProps {
   onToggleView: () => void;
   onToggleRecord: () => void;
   onToggleAddMenu: () => void;
-  onOpenMedia: (type: MediaModalType) => void;
+  onSendText?: (text: string) => void;
+  onAudioRecorded?: (audioBlob: Blob, durationSec: number) => void;
+  onPhotoCaptured?: (imageDataUrl: string) => void;
 }
 
 export default function ControlDeck({
@@ -20,62 +31,99 @@ export default function ControlDeck({
   onToggleView,
   onToggleRecord,
   onToggleAddMenu,
-  onOpenMedia,
+  onSendText,
+  onAudioRecorded,
+  onPhotoCaptured,
 }: ControlDeckProps) {
   return (
-    <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3 items-center">
-      <button
-        onClick={onToggleView}
-        className="w-14 h-14 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl border border-black/[0.04] rounded-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] active:scale-[0.96] transition-all group"
-      >
-        {viewMode === "flat" ? (
-          <Mountain className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors" />
-        ) : (
-          <Map className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors" />
-        )}
-        <span className="text-[9px] font-bold tracking-tight uppercase text-black/40 mt-1">
-          {viewMode === "flat" ? "3D" : "2D"}
-        </span>
-      </button>
+    <>
+      {/* Floating Side Controls */}
+      <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-3">
 
-      <button
-        onClick={onToggleRecord}
-        className={`w-14 h-14 flex flex-col items-center justify-center rounded-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] active:scale-[0.96] transition-all ${
-          isRecording ? "bg-black text-white" : "bg-white border border-black/[0.04] text-[#0052FF]"
-        }`}
-      >
-        <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? "bg-white animate-pulse" : "bg-[#0052FF]"}`} />
-        <span className={`text-[9px] font-bold tracking-tight uppercase mt-1.5 ${isRecording ? "text-white/60" : "text-black/50"}`}>
-          {isRecording ? "Stop" : "Start"}
-        </span>
-      </button>
+        {/* Map View Toggle */}
+        <button
+          onClick={onToggleView}
+          className="group relative w-[58px] h-[58px] rounded-[22px] bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200"
+        >
+          {/* Light reflection */}
+          <div className="absolute inset-0 rounded-[22px] bg-gradient-to-b from-white/60 to-transparent pointer-events-none" />
 
-      {isRecording && (
-        <div className="flex flex-col gap-2 items-center mt-2 pt-2 border-t border-black/[0.05]">
-          <button
-            onClick={onToggleAddMenu}
-            className={`w-12 h-12 rounded-[16px] flex items-center justify-center shadow-sm transition-all active:scale-95 ${
-              isAddMenuOpen ? "bg-black text-white rotate-45" : "bg-white border border-black/[0.04] text-black/60 hover:text-black"
+          {viewMode === "flat" ? (
+            <Mountain className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors duration-200" />
+          ) : (
+            <Map className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors duration-200" />
+          )}
+
+          <span className="mt-1 text-[9px] font-semibold tracking-tight text-black/40">
+            {viewMode === "flat" ? "3D" : "2D"}
+          </span>
+        </button>
+
+        {/* Start / Stop */}
+        <button
+          onClick={onToggleRecord}
+          className={`group relative w-[58px] h-[58px] rounded-[22px] backdrop-blur-2xl border shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200 overflow-hidden ${
+            isRecording
+              ? "bg-black border-black text-white"
+              : "bg-white/80 border-black/[0.05] text-black"
+          }`}
+        >
+          {/* Reflection */}
+          <div
+            className={`absolute inset-0 pointer-events-none ${
+              isRecording
+                ? "bg-gradient-to-b from-white/10 to-transparent"
+                : "bg-gradient-to-b from-white/60 to-transparent"
+            }`}
+          />
+
+          {isRecording ? (
+            <Square className="w-[15px] h-[15px] fill-white text-white" />
+          ) : (
+            <Circle className="w-[15px] h-[15px] fill-black text-black" />
+          )}
+
+          <span
+            className={`mt-1 text-[9px] font-semibold tracking-tight ${
+              isRecording ? "text-white/55" : "text-black/40"
             }`}
           >
-            <Plus className="w-5 h-5 stroke-[2.5]" />
-          </button>
+            {isRecording ? "Stop" : "Start"}
+          </span>
+        </button>
 
-          {isAddMenuOpen && (
-            <div className="flex flex-col gap-2 p-1.5 bg-white/95 backdrop-blur-xl rounded-[18px] border border-black/[0.04] shadow-md animate-fade-in-up">
-              <button onClick={() => onOpenMedia("text")} className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95">
-                <MessageSquareMore className="w-4 h-4" />
-              </button>
-              <button onClick={() => onOpenMedia("image")} className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95">
-                <Camera className="w-4 h-4" />
-              </button>
-              <button onClick={() => onOpenMedia("voice")} className="w-9 h-9 rounded-[12px] bg-black/[0.03] hover:bg-[#0052FF] hover:text-white flex items-center justify-center text-black/70 transition-all active:scale-95">
-                <AudioWaveform className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Add Button */}
+        {isRecording && (
+          <button
+            onClick={onToggleAddMenu}
+            className={`group relative mt-1 w-[52px] h-[52px] rounded-[20px] backdrop-blur-2xl border shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-[0.96] transition-all duration-300 overflow-hidden ${
+              isAddMenuOpen
+                ? "bg-black border-black text-white rotate-45"
+                : "bg-white/80 border-black/[0.05] text-black/65"
+            }`}
+          >
+            {/* Reflection */}
+            <div
+              className={`absolute inset-0 pointer-events-none ${
+                isAddMenuOpen
+                  ? "bg-gradient-to-b from-white/10 to-transparent"
+                  : "bg-gradient-to-b from-white/60 to-transparent"
+              }`}
+            />
+
+            <Plus className="w-[20px] h-[20px] stroke-[2.4]" />
+          </button>
+        )}
+      </div>
+
+      {/* Bottom Action Dock */}
+      {isRecording && isAddMenuOpen && (
+        <ActionDock
+          onSendText={onSendText}
+          onAudioRecorded={onAudioRecorded}
+          onPhotoCaptured={onPhotoCaptured}
+        />
       )}
-    </div>
+    </>
   );
 }

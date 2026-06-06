@@ -1,6 +1,5 @@
 export type LoadingStage = "booting" | "searching" | "improving" | "done";
 export type ViewMode = "flat" | "tilted";
-export type MediaModalType = "text" | "image" | "voice" | null;
 
 export interface WaypointMedia {
   id: string;

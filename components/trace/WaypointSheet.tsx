@@ -30,11 +30,21 @@ export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheet
 
         {activeWaypoint.type === "image" && (
           <div className="space-y-3.5">
-            <div className="w-full aspect-[16/10] bg-black/[0.03] border border-black/[0.05] rounded-[20px] flex flex-col items-center justify-center text-black/20">
-              <Camera className="w-8 h-8 stroke-[1.5] mb-1" />
-              <span className="text-[10px] font-semibold tracking-tight text-black/35">Asset Snapshot Layer</span>
-            </div>
-            <p className="text-sm font-medium text-black/80 tracking-tight px-0.5">{activeWaypoint.content}</p>
+            {activeWaypoint.content.startsWith("data:image/") ? (
+              <img
+                src={activeWaypoint.content}
+                alt="Captured Snapshot"
+                className="w-full aspect-[16/10] object-cover rounded-[20px] border border-black/[0.05]"
+              />
+            ) : (
+              <>
+                <div className="w-full aspect-[16/10] bg-black/[0.03] border border-black/[0.05] rounded-[20px] flex flex-col items-center justify-center text-black/20">
+                  <Camera className="w-8 h-8 stroke-[1.5] mb-1" />
+                  <span className="text-[10px] font-semibold tracking-tight text-black/35">Asset Snapshot Layer</span>
+                </div>
+                <p className="text-sm font-medium text-black/80 tracking-tight px-0.5">{activeWaypoint.content}</p>
+              </>
+            )}
           </div>
         )}
 

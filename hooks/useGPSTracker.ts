@@ -80,7 +80,7 @@ export function useGPSTracker(
         if (data.longitude && data.latitude) {
           initialCoords = [data.longitude, data.latitude];
         }
-      } catch {}
+      } catch { }
 
       setBaseLocation(initialCoords);
       setUserLocation(initialCoords);
@@ -137,7 +137,7 @@ export function useGPSTracker(
 
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify([rawLng, rawLat]));
-        } catch (e) {}
+        } catch (e) { }
 
         // If bootstrap hasn't finished yet, GPS arriving first clears loading
         setLoadingStage("done");
