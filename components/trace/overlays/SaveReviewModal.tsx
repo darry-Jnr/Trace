@@ -40,9 +40,9 @@ export default function SaveReviewModal({
 
     try {
       // 1. Mapbox expects longitude,latitude pairs separated by commas
-      // We flip index order safely here to pass standard GPS structures [lat, lng]
+      // Coordinates are stored in standard format [longitude, latitude], so p[0] is longitude and p[1] is latitude
       const coordinateString = points
-        .map((p) => `${p[1]},${p[0]}`)
+        .map((p) => `${p[0]},${p[1]}`)
         .join(",");
       
       // 2. Configure line paint properties: path-strokeWidth+strokeColor-opacity(points)

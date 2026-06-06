@@ -9,7 +9,7 @@ import {
   Circle,
 } from "lucide-react";
 
-import ActionDock from "./ActionDock";
+import ActionDock from "./dock/ActionDock";
 import { ViewMode } from "@/types";
 
 interface ControlDeckProps {

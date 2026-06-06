@@ -20,11 +20,19 @@ export default function VoiceRecorder({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const recTimeRef = useRef(0);
+  const isRecordingIntentRef = useRef(false);
 
   // --- AUDIO PIPELINE ENGINE ---
   const startRecording = async () => {
+    isRecordingIntentRef.current = true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!isRecordingIntentRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
 
@@ -34,8 +42,9 @@ export default function VoiceRecorder({
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        if (audioChunksRef.current.length > 0 && recTime > 0) {
-          onAudioRecorded?.(audioBlob, recTime);
+        const duration = recTimeRef.current;
+        if (audioChunksRef.current.length > 0 && duration > 0) {
+          onAudioRecorded?.(audioBlob, duration);
         }
         stream.getTracks().forEach((track) => track.stop());
       };
@@ -43,15 +52,22 @@ export default function VoiceRecorder({
       mediaRecorderRef.current.start();
       onStateChange("recording");
       setRecTime(0);
+      recTimeRef.current = 0;
       timerRef.current = setInterval(() => {
-        setRecTime((prev) => prev + 1);
+        setRecTime((prev) => {
+          const next = prev + 1;
+          recTimeRef.current = next;
+          return next;
+        });
       }, 1000);
     } catch (err) {
       console.error("Audio recording system initialization error:", err);
+      isRecordingIntentRef.current = false;
     }
   };
 
   const stopAndSaveRecording = () => {
+    isRecordingIntentRef.current = false;
     cleanupAudioTimer();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
@@ -61,6 +77,7 @@ export default function VoiceRecorder({
   };
 
   const cancelRecording = () => {
+    isRecordingIntentRef.current = false;
     cleanupAudioTimer();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.onstop = null; // Discard chunks cleanly

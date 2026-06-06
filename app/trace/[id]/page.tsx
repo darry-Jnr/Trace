@@ -3,16 +3,17 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
-import SaveReviewModal from "@/components/trace/SaveReviewModal";
+import SaveReviewModal from "@/components/trace/overlays/SaveReviewModal";
 
-import { useGPSTracker } from "@/hooks/useGPSTracker";
-import { useMapEngine } from "@/hooks/useMapEngine";
+import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
+import { useMapEngine } from "@/hooks/trace/useMapEngine";
 import { WaypointMedia } from "@/types";
 
 import MapCanvas from "@/components/trace/MapCanvas";
 import ControlDeck from "@/components/trace/ControlDeck";
-import WaypointSheet from "@/components/trace/WaypointSheet";
-import InitialLoader from "@/components/trace/InitialLoader";
+import WaypointSheet from "@/components/trace/overlays/WaypointSheet";
+import InitialLoader from "@/components/trace/overlays/InitialLoader";
+import ReplayOverlay from "@/components/trace/overlays/ReplayOverlay";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -34,6 +35,7 @@ export default function TraceWorkspacePage() {
   const [isReplayMode, setIsReplayMode] = useState(false);
   const [replayBaseLocation, setReplayBaseLocation] = useState<[number, number] | null>(null);
   const [traceDistance, setTraceDistance] = useState("0.0 mi");
+  const [traceDate, setTraceDate] = useState("");
 
   // --- 1. LIFE CYCLE SYSTEM: READ LOCAL STORAGE VS GENERATE FRESH ---
   useEffect(() => {
@@ -59,7 +61,10 @@ export default function TraceWorkspacePage() {
           if (savedTrace.distance) {
             setTraceDistance(savedTrace.distance);
           }
-          setShowSaveReview(true);
+          if (savedTrace.date) {
+            setTraceDate(savedTrace.date);
+          }
+          setShowSaveReview(false);
           return;
         }
       }
@@ -100,7 +105,7 @@ export default function TraceWorkspacePage() {
     toggleViewPerspective,
     handleLocationStream,
     updateVectorPath,
-    injectDOMMarker
+    centerOnCoords
   } = useMapEngine(
     mapRef,
     isReplayMode ? replayBaseLocation : baseLocation,
@@ -109,13 +114,7 @@ export default function TraceWorkspacePage() {
     savedMedia
   );
 
-  // Sync historical pins dynamically into the Canvas Map when Replay view opens
-  useEffect(() => {
-    if (isReplayMode && savedMedia.length > 0) {
-      savedMedia.forEach(marker => injectDOMMarker(marker));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReplayMode, savedMedia]);
+
 
   // Fallback fallback pointer coordinate interceptor
   const getCurrentCapturePoint = () => {
@@ -133,7 +132,6 @@ export default function TraceWorkspacePage() {
       coordinates: targetCoords,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
-    injectDOMMarker(newMedia);
     setIsAddMenuOpen(false);
   };
 
@@ -147,9 +145,8 @@ export default function TraceWorkspacePage() {
       coordinates: targetCoords,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
-    injectDOMMarker(newMedia);
     setIsAddMenuOpen(false);
-  };
+  }; 
 
   const handleSavePhotoMarker = (imageDataUrl: string) => {
     const targetCoords = getCurrentCapturePoint();
@@ -161,7 +158,6 @@ export default function TraceWorkspacePage() {
       coordinates: targetCoords,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
-    injectDOMMarker(newMedia);
     setIsAddMenuOpen(false);
   };
 
@@ -210,11 +206,16 @@ export default function TraceWorkspacePage() {
   };
 
   const handleCloseSaveReview = () => {
-    if (isReplayMode) {
-      router.push("/dashboard");
-    } else {
-      setShowSaveReview(false);
-    }
+    setShowSaveReview(false);
+  };
+
+  const handleFollowRoute = () => {
+    setIsReplayMode(false);
+    setSavedMedia([]);
+    setShowSaveReview(false);
+    setIsRecording(true);
+    setIsAddMenuOpen(false);
+    toast.info("Following Route", "Recording a new path along this trace guide.");
   };
 
   // --- LOADER CONFIGURATION DIALS ---
@@ -238,8 +239,24 @@ export default function TraceWorkspacePage() {
         {/* SIDE DRAWER MARKER NODE SHEETS */}
         <WaypointSheet activeWaypoint={activeWaypoint} onClose={() => setActiveWaypoint(null)} />
 
+        {/* REPLAY PANEL: shown when viewing a saved trace */}
+        {isReplayMode && (
+          <ReplayOverlay
+            title={traceTitleInput}
+            date={traceDate}
+            distance={traceDistance}
+            waypoints={savedMedia}
+            onBack={() => router.push("/dashboard")}
+            onFollow={handleFollowRoute}
+            onWaypointSelect={(wp) => {
+              centerOnCoords(wp.coordinates);
+              setActiveWaypoint(wp);
+            }}
+            activeWaypointId={activeWaypoint?.id}
+          />
+        )}
+
         {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
-        {/* FIX: ControlDeck now stays open natively for tracking configurations if not reviewing past links */}
         {!showInitialLoader && !isReplayMode && (
           <ControlDeck
             viewMode={viewMode}
@@ -255,18 +272,19 @@ export default function TraceWorkspacePage() {
         )}
       </div>
 
-      {/* VERIFICATION AND BACKUP REPLAY PANEL OVERLAY SUMMARY */}
-      <SaveReviewModal
-        isOpen={showSaveReview}
-        onClose={handleCloseSaveReview}
-        title={traceTitleInput}
-        onTitleChange={setTraceTitleInput}
-        waypointCount={savedMedia.length}
-        distance={isReplayMode ? traceDistance : (trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi")}
-        onSave={handleCommitSaveTrace}
-        points={trailCoordinates}
-        isReadOnly={isReplayMode}
-      />
+      {/* POST-RECORDING SAVE REVIEW MODAL */}
+      {!isReplayMode && (
+        <SaveReviewModal
+          isOpen={showSaveReview}
+          onClose={handleCloseSaveReview}
+          title={traceTitleInput}
+          onTitleChange={setTraceTitleInput}
+          waypointCount={savedMedia.length}
+          distance={trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi"}
+          onSave={handleCommitSaveTrace}
+          points={trailCoordinates}
+        />
+      )}
 
       {/* BLOCKING HARDWARE LOADING TIMELINE MASK */}
       <InitialLoader isLoading={showInitialLoader} loadingMessage={loadingMessageStr} />

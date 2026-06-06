@@ -30,24 +30,32 @@ export default function CameraViewport({
   };
 
   useEffect(() => {
+    let isMounted = true;
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" },
           audio: false,
         });
+        if (!isMounted) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
         console.error("Camera hardware pipeline access blocked:", err);
-        onClose();
+        if (isMounted) {
+          onClose();
+        }
       }
     };
 
     startCamera();
     return () => {
+      isMounted = false;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }

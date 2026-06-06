@@ -13,7 +13,7 @@ export function useMapEngine(
 ) {
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const injectedMarkerIds = useRef<Set<string>>(new Set());
+  const injectedMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
 
   // Mount Instance Mapbox Canvas
@@ -72,11 +72,12 @@ export function useMapEngine(
     mapInstanceRef.current = map;
     userMarkerRef.current = userMarker;
 
-    const markerCache = injectedMarkerIds.current;
+    const markerCache = injectedMarkersRef.current;
     return () => {
       if (userMarkerRef.current) userMarkerRef.current.remove();
       map.remove();
       mapInstanceRef.current = null;
+      markerCache.forEach((marker) => marker.remove());
       markerCache.clear();
     };
   }, [baseLocation, mapRef]);
@@ -119,7 +120,7 @@ export function useMapEngine(
 
   const injectDOMMarker = (waypoint: WaypointMedia) => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map) return null;
 
     const el = document.createElement("div");
     el.className = "w-8 h-8 rounded-[10px] bg-black text-white border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95 z-30";
@@ -137,7 +138,8 @@ export function useMapEngine(
       map.easeTo({ center: waypoint.coordinates, duration: 600 });
     });
 
-    new mapboxgl.Marker({ element: el }).setLngLat(waypoint.coordinates).addTo(map);
+    const marker = new mapboxgl.Marker({ element: el }).setLngLat(waypoint.coordinates).addTo(map);
+    return marker;
   };
 
   // Sync vector path trail to Mapbox source layer automatically on updates
@@ -156,16 +158,34 @@ export function useMapEngine(
     }
   }, [trailCoordinates]);
 
+  const savedMediaRef = useRef(savedMedia);
+  useEffect(() => {
+    savedMediaRef.current = savedMedia;
+  }, [savedMedia]);
+
   // Sync waypoint DOM markers to Mapbox map dynamically on updates
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     const applyWaypoints = () => {
-      savedMedia.forEach((waypoint) => {
-        if (!injectedMarkerIds.current.has(waypoint.id)) {
-          injectDOMMarker(waypoint);
-          injectedMarkerIds.current.add(waypoint.id);
+      const currentIds = new Set(savedMediaRef.current.map((wp) => wp.id));
+
+      // 1. Remove markers that are no longer in savedMedia
+      injectedMarkersRef.current.forEach((marker, id) => {
+        if (!currentIds.has(id)) {
+          marker.remove();
+          injectedMarkersRef.current.delete(id);
+        }
+      });
+
+      // 2. Add markers that are new
+      savedMediaRef.current.forEach((waypoint) => {
+        if (!injectedMarkersRef.current.has(waypoint.id)) {
+          const marker = injectDOMMarker(waypoint);
+          if (marker) {
+            injectedMarkersRef.current.set(waypoint.id, marker);
+          }
         }
       });
     };
@@ -178,5 +198,11 @@ export function useMapEngine(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedMedia]);
 
-  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, injectDOMMarker };
+  const centerOnCoords = (coords: [number, number]) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.easeTo({ center: coords, zoom: 17, duration: 700 });
+  };
+
+  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, injectDOMMarker, centerOnCoords };
 }
