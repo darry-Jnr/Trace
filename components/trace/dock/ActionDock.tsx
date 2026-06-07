@@ -17,12 +17,15 @@ export default function ActionDock({
   onPhotoCaptured,
 }: ActionDockProps) {
   const [inputValue, setInputValue] = useState("");
-  const [dockMode, setDockMode] = useState<"idle" | "recording" | "locked-recording" | "camera">("idle");
+  const [dockMode, setDockMode] = useState<
+    "idle" | "recording" | "locked-recording" | "camera"
+  >("idle");
 
   const hasText = inputValue.trim().length > 0;
 
   const handleSendText = () => {
     if (!inputValue.trim()) return;
+
     onSendText?.(inputValue.trim());
     setInputValue("");
   };
@@ -30,15 +33,23 @@ export default function ActionDock({
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-full px-4 flex justify-center pointer-events-none animate-fade-in-up">
       <div className="pointer-events-auto relative w-full max-w-[520px]">
-        {/* Dynamic Multi-State Interface Frame */}
+        {/* Dynamic Glass Surface */}
         <div
-          className={`absolute inset-0 rounded-[30px] border border-black/[0.05] bg-white/80 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all duration-300 ${
-            dockMode === "camera" ? "h-[260px] top-[-192px]" : "h-[68px]"
+          className={`absolute inset-0 rounded-[30px]
+          border border-black/[0.035]
+          bg-white/72
+          backdrop-blur-2xl
+          shadow-[0_8px_30px_rgba(0,0,0,0.045)]
+          transition-all duration-300 ${
+            dockMode === "camera"
+              ? "h-[260px] top-[-192px]"
+              : "h-[68px]"
           }`}
         />
 
-        {/* --- INLINE MODE INTERFACE DISPATCHER --- */}
+        {/* Interface Layer */}
         <div className="relative flex flex-col justify-end">
+          {/* Camera Mode */}
           {dockMode === "camera" && (
             <CameraViewport
               onPhotoCaptured={onPhotoCaptured}
@@ -46,50 +57,74 @@ export default function ActionDock({
             />
           )}
 
+          {/* Standard Dock */}
           {dockMode !== "camera" && (
             <div className="flex items-center gap-2 h-[68px] px-3">
+              {/* Idle Mode */}
               {dockMode === "idle" && (
                 <>
-                  <div className="flex-1 h-12 rounded-[20px] bg-black/[0.03] border border-black/[0.04] flex items-center px-4 transition-all focus-within:bg-white focus-within:border-black/[0.08]">
+                  {/* Camera Left */}
+                  <button
+                    onClick={() => setDockMode("camera")}
+                    className="w-11 h-11 rounded-[16px]
+                    bg-white/60
+                    border border-black/[0.03]
+                    flex items-center justify-center
+                    active:scale-95
+                    transition-all
+                    hover:bg-black/[0.015]"
+                    title="Open Camera"
+                  >
+                    <Camera className="w-[18px] h-[18px] text-black/60 stroke-[1.9]" />
+                  </button>
+
+                  {/* Input */}
+                  <div
+                    className="flex-1 h-11 rounded-[18px]
+                    bg-black/[0.025]
+                    border border-black/[0.03]
+                    flex items-center px-4
+                    transition-all
+                    focus-within:bg-white/70
+                    focus-within:border-black/[0.05]"
+                  >
                     <input
                       type="text"
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendText()}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && handleSendText()
+                      }
                       placeholder="Add a note to this place..."
-                      className="w-full bg-transparent outline-none border-none text-[14px] font-medium tracking-tight text-black placeholder:text-black/30"
+                      className="w-full bg-transparent outline-none border-none text-[14px] font-medium tracking-tight text-black/85 placeholder:text-black/25"
                     />
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {!hasText ? (
-                      <>
-                        <VoiceRecorder
-                          onAudioRecorded={onAudioRecorded}
-                          isActive={false}
-                          onStateChange={(state) => setDockMode(state)}
-                        />
-                        <button
-                          onClick={() => setDockMode("camera")}
-                          className="w-12 h-12 rounded-[18px] bg-white border border-black/[0.05] shadow-sm flex items-center justify-center active:scale-95 transition-all hover:bg-black/[0.02]"
-                          title="Open Live Lens"
-                        >
-                          <Camera className="w-[19px] h-[19px] text-black/70 stroke-[2.3]" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={handleSendText}
-                        className="w-12 h-12 rounded-[18px] bg-black text-white flex items-center justify-center shadow-md active:scale-95 transition-all hover:scale-[1.02]"
-                      >
-                        <SendHorizontal className="w-[18px] h-[18px] stroke-[2.5] translate-x-[1px]" />
-                      </button>
-                    )}
-                  </div>
+                  {/* Right Action */}
+                  {!hasText ? (
+                    <VoiceRecorder
+                      onAudioRecorded={onAudioRecorded}
+                      isActive={false}
+                      onStateChange={(state) => setDockMode(state)}
+                    />
+                  ) : (
+                    <button
+                      onClick={handleSendText}
+                      className="w-11 h-11 rounded-[16px]
+                      bg-black text-white
+                      flex items-center justify-center
+                      active:scale-95
+                      transition-all"
+                    >
+                      <SendHorizontal className="w-[17px] h-[17px] stroke-[2]" />
+                    </button>
+                  )}
                 </>
               )}
 
-              {(dockMode === "recording" || dockMode === "locked-recording") && (
+              {/* Recording States */}
+              {(dockMode === "recording" ||
+                dockMode === "locked-recording") && (
                 <VoiceRecorder
                   onAudioRecorded={onAudioRecorded}
                   isActive={true}
