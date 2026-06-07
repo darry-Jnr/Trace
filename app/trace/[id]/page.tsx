@@ -38,6 +38,7 @@ export default function TraceWorkspacePage() {
   const [traceDate, setTraceDate] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<string>("");
 
   const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
     const R = 6371000;
@@ -71,6 +72,19 @@ export default function TraceWorkspacePage() {
   useEffect(() => {
     setTraceDistance(formatDistance(trailCoordinates));
   }, [trailCoordinates]);
+
+  // Warn user before leaving with unsaved media
+  useEffect(() => {
+    if (isReplayMode) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      if (pendingMediaRef.current.size > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isReplayMode]);
 
   const uploadFile = useCallback(async (
     file: File,
@@ -263,6 +277,7 @@ export default function TraceWorkspacePage() {
     } else {
       setIsRecording(true);
       setIsAddMenuOpen(false);
+      setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
     }
   };
 
@@ -283,18 +298,27 @@ export default function TraceWorkspacePage() {
         const file = new File([blob], `voice-${wp.id}.webm`, { type: "audio/webm" });
         uploadPromises.push(
           uploadFile(file, id, wp.id).then((url) => {
-            if (url) wp.fileUrl = url;
+            if (url) {
+              setSavedMedia((prev) => prev.map((m) => m.id === wp.id ? { ...m, fileUrl: url } : m));
+            }
           })
         );
       } else if (wp.type === "image") {
-        const dataUrl = pendingData as string;
-        const res = await fetch(dataUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `photo-${wp.id}.jpg`, { type: "image/jpeg" });
         uploadPromises.push(
-          uploadFile(file, id, wp.id).then((url) => {
-            if (url) wp.fileUrl = url;
-          })
+          (async () => {
+            try {
+              const dataUrl = pendingData as string;
+              const res = await fetch(dataUrl);
+              const blob = await res.blob();
+              const file = new File([blob], `photo-${wp.id}.jpg`, { type: "image/jpeg" });
+              const url = await uploadFile(file, id, wp.id);
+              if (url) {
+                setSavedMedia((prev) => prev.map((m) => m.id === wp.id ? { ...m, fileUrl: url } : m));
+              }
+            } catch (e) {
+              console.error("Failed to upload image for waypoint", wp.id, e);
+            }
+          })()
         );
       }
     }
@@ -428,9 +452,11 @@ export default function TraceWorkspacePage() {
           title={traceTitleInput}
           onTitleChange={setTraceTitleInput}
           waypointCount={savedMedia.length}
-          distance={trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi"}
+          distance={traceDistance}
           onSave={handleCommitSaveTrace}
           points={trailCoordinates}
+          isSaving={isSaving}
+          createdAt={recordingStartedAt}
         />
       )}
 

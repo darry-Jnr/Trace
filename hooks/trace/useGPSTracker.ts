@@ -29,6 +29,7 @@ export function useGPSTracker(
 
   const isRecordingRef = useRef(isRecording);
   const pathCoordsRef = useRef<[number, number][]>([]);
+  const smoothedCoordsRef = useRef<[number, number] | null>(null);
 
   // FIX #1 & #2: Store callbacks in stable refs so they never appear in
   // useEffect dependency arrays. This prevents the GPS watchPosition from
@@ -73,12 +74,14 @@ export function useGPSTracker(
       // as null. If GPS then failed or timed out, the map would render but the
       // ControlDeck would never appear (it gates on userLocation being set).
       // Now we set BOTH so the user always sees a usable map.
-      let initialCoords: [number, number] = [3.3792, 6.5244];
+      let initialCoords: [number, number] = [-74.006, 40.7128];
       try {
         const response = await fetch("https://ipapi.co/json/");
-        const data = await response.json();
-        if (data.longitude && data.latitude) {
-          initialCoords = [data.longitude, data.latitude];
+        if (response.ok) {
+          const data = await response.json();
+          if (data.longitude != null && data.latitude != null) {
+            initialCoords = [data.longitude, data.latitude];
+          }
         }
       } catch { }
 
@@ -103,37 +106,36 @@ export function useGPSTracker(
 
         if (accuracy > 25 && isRecordingRef.current) return;
 
-        let finalCoords: [number, number] = [rawLng, rawLat];
-
-        setUserLocation((prev) => {
-          if (prev) {
-            finalCoords = [
+        // Smooth coordinates using exponential moving average
+        const prev = smoothedCoordsRef.current;
+        const finalCoords: [number, number] = prev
+          ? [
               prev[0] * 0.25 + rawLng * 0.75,
               prev[1] * 0.25 + rawLat * 0.75,
-            ];
-          }
+            ]
+          : [rawLng, rawLat];
+        smoothedCoordsRef.current = finalCoords;
 
-          // Use refs instead of direct callback params
-          onLocationUpdateRef.current(finalCoords, heading);
+        setUserLocation(finalCoords);
 
-          if (isRecordingRef.current) {
-            const history = pathCoordsRef.current;
-            if (history.length === 0) {
-              pathCoordsRef.current = [finalCoords];
+        // Callback outside state updater — no more side effects inside setUserLocation
+        onLocationUpdateRef.current(finalCoords, heading);
+
+        if (isRecordingRef.current) {
+          const history = pathCoordsRef.current;
+          if (history.length === 0) {
+            pathCoordsRef.current = [finalCoords];
+            onPathAppendRef.current(pathCoordsRef.current);
+          } else {
+            const lastSavedPoint = history[history.length - 1];
+            const distanceMoved = getDistanceMeters(lastSavedPoint, finalCoords);
+
+            if (distanceMoved > 3.5) {
+              pathCoordsRef.current = [...history, finalCoords];
               onPathAppendRef.current(pathCoordsRef.current);
-            } else {
-              const lastSavedPoint = history[history.length - 1];
-              const distanceMoved = getDistanceMeters(lastSavedPoint, finalCoords);
-
-              if (distanceMoved > 3.5) {
-                pathCoordsRef.current = [...history, finalCoords];
-                onPathAppendRef.current(pathCoordsRef.current);
-              }
             }
           }
-
-          return finalCoords;
-        });
+        }
 
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify([rawLng, rawLat]));

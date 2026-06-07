@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
+
 interface InitialLoaderProps {
   isLoading: boolean;
   loadingMessage: string;
@@ -9,11 +11,27 @@ export default function InitialLoader({
   isLoading,
   loadingMessage,
 }: InitialLoaderProps) {
+  const [visible, setVisible] = useState(true);
+  const [fadingOut, setFadingOut] = useState(false);
+  const prevLoadingRef = useRef(isLoading);
 
-  if (!isLoading) return null;
+  useEffect(() => {
+    if (prevLoadingRef.current && !isLoading) {
+      setFadingOut(true);
+      const timer = setTimeout(() => setVisible(false), 500);
+      return () => clearTimeout(timer);
+    }
+    prevLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  if (!visible) return null;
 
   return (
-    <div className="absolute inset-0 z-50 overflow-hidden bg-[#f5f5f7] flex items-center justify-center select-none">
+    <div
+      className={`absolute inset-0 z-50 overflow-hidden bg-[#f5f5f7] flex items-center justify-center select-none transition-opacity duration-500 ${
+        fadingOut ? "opacity-0" : "opacity-100"
+      }`}
+    >
 
       {/* Soft Background Glow */}
       <div className="absolute inset-0 overflow-hidden">

@@ -14,9 +14,13 @@ export default function CameraViewport({
 }: CameraViewportProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const onCloseRef = useRef(onClose);
   const [preview, setPreview] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [flash, setFlash] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   const cleanup = useCallback(() => {
     if (streamRef.current) {
@@ -27,6 +31,7 @@ export default function CameraViewport({
 
   const startCamera = useCallback(async (facing: "environment" | "user") => {
     cleanup();
+    setCameraError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing },
@@ -36,16 +41,23 @@ export default function CameraViewport({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Camera hardware pipeline access blocked:", err);
-      onClose();
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setCameraError("Camera access denied. Please allow camera permissions in your browser settings.");
+      } else if (err?.name === "NotFoundError") {
+        setCameraError("No camera found on this device.");
+      } else {
+        setCameraError("Could not open camera. Please try again.");
+      }
     }
-  }, [cleanup, onClose]);
+  }, [cleanup]);
 
   useEffect(() => {
     startCamera(facingMode);
     return cleanup;
-  }, [facingMode, startCamera, cleanup]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facingMode]);
 
   const captureSnapshot = useCallback(() => {
     if (videoRef.current) {
@@ -73,19 +85,34 @@ export default function CameraViewport({
       onPhotoCaptured?.(preview);
     }
     cleanup();
-    onClose();
-  }, [preview, onPhotoCaptured, cleanup, onClose]);
-
-  const retakePhoto = useCallback(() => {
-    setPreview(null);
-  }, []);
+    onCloseRef.current();
+  }, [preview, onPhotoCaptured, cleanup]);
 
   const toggleCamera = useCallback(() => {
     setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
     setPreview(null);
   }, []);
 
-  // If no camera available, show nothing (error handled in startCamera)
+  const retakePhoto = useCallback(() => {
+    setPreview(null);
+  }, []);
+
+  // Permission denied / camera unavailable error state
+  if (cameraError) {
+    return (
+      <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-4 p-8 animate-fade-in">
+        <Camera className="w-12 h-12 text-white/40" />
+        <p className="text-white/70 text-center text-sm max-w-xs">{cameraError}</p>
+        <button
+          onClick={() => { cleanup(); onCloseRef.current(); }}
+          className="px-6 h-11 rounded-full bg-white/20 backdrop-blur-md text-white text-sm font-medium active:scale-95 transition"
+        >
+          Close
+        </button>
+      </div>
+    );
+  }
+
   // Fullscreen preview after capture
   if (preview) {
     return (
@@ -131,7 +158,7 @@ export default function CameraViewport({
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 p-4 pt-12 flex items-center justify-between bg-gradient-to-b from-black/50 to-transparent">
         <button
-          onClick={() => { cleanup(); onClose(); }}
+          onClick={() => { cleanup(); onCloseRef.current(); }}
           className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center active:scale-90 transition"
         >
           <X className="w-5 h-5 text-white" />

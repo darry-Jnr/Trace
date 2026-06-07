@@ -11,6 +11,7 @@ interface WaypointSheetProps {
 
 export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheetProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   if (!activeWaypoint) return null;
@@ -71,25 +72,37 @@ export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheet
             <p className="text-sm font-medium text-black/80 italic tracking-tight leading-relaxed">{activeWaypoint.content}</p>
             <div className="flex items-center gap-3 bg-black/[0.02] border border-black/[0.04] rounded-[18px] p-3">
               {audioSrc ? (
-                <>
-                  <button
-                    onClick={togglePlay}
-                    className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center shadow-sm active:scale-95 transition-transform shrink-0"
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
-                  </button>
-                  <audio
-                    ref={audioRef}
-                    src={audioSrc}
-                    onEnded={() => setIsPlaying(false)}
-                    preload="auto"
-                  />
-                  <div className="flex items-center gap-[3px] h-6 flex-1 opacity-25">
-                    {[2, 4, 3, 6, 2, 5, 4, 7, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 5, 2, 4].map((val, i) => (
-                      <div key={i} className="bg-black rounded-full flex-1" style={{ height: `${val * 12}%` }} />
-                    ))}
+                audioError ? (
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="w-9 h-9 rounded-full bg-red-50 text-red-400 flex items-center justify-center shrink-0">
+                      <X className="w-4 h-4" />
+                    </div>
+                    <span className="text-[13px] font-medium text-red-400/70 tracking-tight">
+                      Audio unavailable
+                    </span>
                   </div>
-                </>
+                ) : (
+                  <>
+                    <button
+                      onClick={togglePlay}
+                      className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center shadow-sm active:scale-95 transition-transform shrink-0"
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
+                    </button>
+                    <audio
+                      ref={audioRef}
+                      src={audioSrc}
+                      onEnded={() => setIsPlaying(false)}
+                      onError={() => setAudioError(true)}
+                      preload="auto"
+                    />
+                    <div className="flex items-center gap-[3px] h-6 flex-1 opacity-25">
+                      {[2, 4, 3, 6, 2, 5, 4, 7, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 5, 2, 4].map((val, i) => (
+                        <div key={i} className="bg-black rounded-full flex-1" style={{ height: `${val * 12}%` }} />
+                      ))}
+                    </div>
+                  </>
+                )
               ) : (
                 <>
                   <button className="w-9 h-9 rounded-full bg-black/20 text-black/40 flex items-center justify-center shrink-0">

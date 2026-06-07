@@ -8,6 +8,7 @@ import {
   MapPinned,
   Clock3,
   ArrowUpRight,
+  LoaderCircle,
 } from "lucide-react";
 
 interface SaveReviewModalProps {
@@ -19,7 +20,8 @@ interface SaveReviewModalProps {
   distance: string;
   onSave: () => void;
   points?: [number, number][]; 
-  isReadOnly?: boolean;
+  isSaving?: boolean;
+  createdAt?: string;
 }
 
 export default function SaveReviewModal({
@@ -31,7 +33,8 @@ export default function SaveReviewModal({
   distance,
   onSave,
   points = [],
-  isReadOnly = false,
+  isSaving = false,
+  createdAt = "",
 }: SaveReviewModalProps) {
   
   // --- PRODUCTION REAL-LIFE METADATA MAP PARSER ---
@@ -86,7 +89,7 @@ export default function SaveReviewModal({
           <X className="w-4 h-4 text-black/70" />
         </button>
         <p className="text-[13px] font-medium tracking-tight text-black/40">
-          {isReadOnly ? "View Trace" : "Review Trace"}
+          Review Trace
         </p>
         <div className="w-10" />
       </header>
@@ -123,7 +126,7 @@ export default function SaveReviewModal({
               <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-black/[0.06] shadow-sm">
                 <Sparkles className="w-3.5 h-3.5 text-black/60" />
                 <span className="text-[11px] font-medium tracking-tight text-black/60">
-                  {isReadOnly ? "Saved Trace" : "Ready to save"}
+                  Ready to save
                 </span>
               </div>
 
@@ -149,19 +152,13 @@ export default function SaveReviewModal({
             <div className="p-5">
               <div>
                 <p className="text-[12px] font-medium text-black/40 mb-2">Trace Name</p>
-                {isReadOnly ? (
-                  <div className="w-full h-14 px-5 rounded-2xl bg-[#f5f5f7] flex items-center text-[15px] font-semibold tracking-tight text-black">
-                    {title}
-                  </div>
-                ) : (
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => onTitleChange(e.target.value)}
-                    placeholder="Home Route"
-                    className="w-full h-14 px-5 rounded-2xl bg-[#f5f5f7] border border-transparent focus:border-black/10 focus:bg-white outline-none transition text-[15px] font-medium tracking-tight placeholder:text-black/25"
-                  />
-                )}
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => onTitleChange(e.target.value)}
+                  placeholder="Home Route"
+                  className="w-full h-14 px-5 rounded-2xl bg-[#f5f5f7] border border-transparent focus:border-black/10 focus:bg-white outline-none transition text-[15px] font-medium tracking-tight placeholder:text-black/25"
+                />
               </div>
 
               {/* Meta Blocks */}
@@ -172,7 +169,7 @@ export default function SaveReviewModal({
                     <span className="text-[11px] font-medium uppercase tracking-wide">Created</span>
                   </div>
                   <p className="text-[14px] font-medium tracking-tight">
-                    {isReadOnly ? "Archived" : "Just now"}
+                    {createdAt || "Just now"}
                   </p>
                 </div>
 
@@ -190,18 +187,23 @@ export default function SaveReviewModal({
 
           {/* Action Trigger Button */}
           <button
-            onClick={isReadOnly ? onClose : onSave}
-            className="mt-5 w-full h-14 rounded-[20px] bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium tracking-tight shadow-lg hover:scale-[1.01] active:scale-[0.985] transition-all"
+            onClick={onSave}
+            disabled={isSaving}
+            className="mt-5 w-full h-14 rounded-[20px] bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium tracking-tight shadow-lg hover:scale-[1.01] active:scale-[0.985] transition-all disabled:opacity-50 disabled:pointer-events-none"
           >
-            <span>{isReadOnly ? "Close View" : "Save Trace"}</span>
-            <ArrowUpRight className="w-4 h-4" />
+            {isSaving ? (
+              <LoaderCircle className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <span>Save Trace</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </>
+            )}
           </button>
 
-          {!isReadOnly && (
-            <p className="text-center text-[12px] text-black/35 mt-4 leading-relaxed">
-              Your route, notes, photos, and voice markers will be saved together.
-            </p>
-          )}
+          <p className="text-center text-[12px] text-black/35 mt-4 leading-relaxed">
+            Your route, notes, photos, and voice markers will be saved together.
+          </p>
         </div>
       </div>
     </div>
