@@ -1,6 +1,7 @@
 "use client";
 
-import { X, Camera, Play } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, Camera, Play, Pause } from "lucide-react";
 import { WaypointMedia } from "@/types";
 
 interface WaypointSheetProps {
@@ -9,7 +10,26 @@ interface WaypointSheetProps {
 }
 
 export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheetProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   if (!activeWaypoint) return null;
+
+  const imageSrc = activeWaypoint.fileUrl || (
+    activeWaypoint.content.startsWith("data:image/") ? activeWaypoint.content : null
+  );
+
+  const audioSrc = activeWaypoint.fileUrl || null;
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-50 flex justify-center p-4 md:pb-6 pointer-events-none">
@@ -30,23 +50,18 @@ export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheet
 
         {activeWaypoint.type === "image" && (
           <div className="space-y-3.5">
-            {activeWaypoint.content.startsWith("data:image/") ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element -- data: URLs aren't supported by next/image */}
-                <img
-                  src={activeWaypoint.content}
-                  alt="Captured Snapshot"
-                  className="w-full aspect-[16/10] object-cover rounded-[20px] border border-black/[0.05]"
-                />
-              </>
+            {imageSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageSrc}
+                alt="Captured Snapshot"
+                className="w-full aspect-[16/10] object-cover rounded-[20px] border border-black/[0.05]"
+              />
             ) : (
-              <>
-                <div className="w-full aspect-[16/10] bg-black/[0.03] border border-black/[0.05] rounded-[20px] flex flex-col items-center justify-center text-black/20">
-                  <Camera className="w-8 h-8 stroke-[1.5] mb-1" />
-                  <span className="text-[10px] font-semibold tracking-tight text-black/35">Asset Snapshot Layer</span>
-                </div>
-                <p className="text-sm font-medium text-black/80 tracking-tight px-0.5">{activeWaypoint.content}</p>
-              </>
+              <div className="w-full aspect-[16/10] bg-black/[0.03] border border-black/[0.05] rounded-[20px] flex flex-col items-center justify-center text-black/20">
+                <Camera className="w-8 h-8 stroke-[1.5] mb-1" />
+                <span className="text-[10px] font-semibold tracking-tight text-black/35">Asset Snapshot Layer</span>
+              </div>
             )}
           </div>
         )}
@@ -55,14 +70,38 @@ export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheet
           <div className="space-y-4">
             <p className="text-sm font-medium text-black/80 italic tracking-tight leading-relaxed">{activeWaypoint.content}</p>
             <div className="flex items-center gap-3 bg-black/[0.02] border border-black/[0.04] rounded-[18px] p-3">
-              <button className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center shadow-sm active:scale-95 transition-transform shrink-0">
-                <Play className="w-4 h-4 fill-white ml-0.5" />
-              </button>
-              <div className="flex items-center gap-[3px] h-6 flex-1 opacity-25">
-                {[2, 4, 3, 6, 2, 5, 4, 7, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 5, 2, 4].map((val, i) => (
-                  <div key={i} className="bg-black rounded-full flex-1" style={{ height: `${val * 12}%` }} />
-                ))}
-              </div>
+              {audioSrc ? (
+                <>
+                  <button
+                    onClick={togglePlay}
+                    className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center shadow-sm active:scale-95 transition-transform shrink-0"
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
+                  </button>
+                  <audio
+                    ref={audioRef}
+                    src={audioSrc}
+                    onEnded={() => setIsPlaying(false)}
+                    preload="auto"
+                  />
+                  <div className="flex items-center gap-[3px] h-6 flex-1 opacity-25">
+                    {[2, 4, 3, 6, 2, 5, 4, 7, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 5, 2, 4].map((val, i) => (
+                      <div key={i} className="bg-black rounded-full flex-1" style={{ height: `${val * 12}%` }} />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button className="w-9 h-9 rounded-full bg-black/20 text-black/40 flex items-center justify-center shrink-0">
+                    <Play className="w-4 h-4 ml-0.5" />
+                  </button>
+                  <div className="flex items-center gap-[3px] h-6 flex-1 opacity-25">
+                    {[2, 4, 3, 6, 2, 5, 4, 7, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 5, 2, 4].map((val, i) => (
+                      <div key={i} className="bg-black rounded-full flex-1" style={{ height: `${val * 12}%` }} />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

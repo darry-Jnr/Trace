@@ -18,8 +18,9 @@ export default function ActionDock({
 }: ActionDockProps) {
   const [inputValue, setInputValue] = useState("");
   const [dockMode, setDockMode] = useState<
-    "idle" | "recording" | "locked-recording" | "camera"
+    "idle" | "recording" | "locked-recording"
   >("idle");
+  const [showCamera, setShowCamera] = useState(false);
 
   const hasText = inputValue.trim().length > 0;
 
@@ -31,41 +32,29 @@ export default function ActionDock({
   };
 
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-full px-4 flex justify-center pointer-events-none animate-fade-in-up">
-      <div className="pointer-events-auto relative w-full max-w-[520px]">
-        {/* Dynamic Glass Surface */}
-        <div
-          className={`absolute inset-0 rounded-[30px]
-          border border-black/[0.035]
-          bg-white/72
-          backdrop-blur-2xl
-          shadow-[0_8px_30px_rgba(0,0,0,0.045)]
-          transition-all duration-300 ${
-            dockMode === "camera"
-              ? "h-[260px] top-[-192px]"
-              : "h-[68px]"
-          }`}
+    <>
+      {/* Fullscreen camera overlay */}
+      {showCamera && (
+        <CameraViewport
+          onPhotoCaptured={onPhotoCaptured}
+          onClose={() => setShowCamera(false)}
         />
+      )}
 
-        {/* Interface Layer */}
-        <div className="relative flex flex-col justify-end">
-          {/* Camera Mode */}
-          {dockMode === "camera" && (
-            <CameraViewport
-              onPhotoCaptured={onPhotoCaptured}
-              onClose={() => setDockMode("idle")}
-            />
-          )}
+      <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-full px-4 flex justify-center pointer-events-none animate-fade-in-up">
+        <div className="pointer-events-auto relative w-full max-w-[520px]">
+          {/* Glass Surface */}
+          <div className="absolute inset-0 rounded-[30px] border border-black/[0.035] bg-white/72 backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,0,0,0.045)] h-[68px]" />
 
-          {/* Standard Dock */}
-          {dockMode !== "camera" && (
+          {/* Interface Layer */}
+          <div className="relative flex flex-col justify-end">
             <div className="flex items-center gap-2 h-[68px] px-3">
               {/* Idle Mode */}
               {dockMode === "idle" && (
                 <>
                   {/* Camera Left */}
                   <button
-                    onClick={() => setDockMode("camera")}
+                    onClick={() => setShowCamera(true)}
                     className="w-11 h-11 rounded-[16px]
                     bg-white/60
                     border border-black/[0.03]
@@ -132,9 +121,9 @@ export default function ActionDock({
                 />
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

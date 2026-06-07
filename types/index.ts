@@ -7,6 +7,7 @@ export interface WaypointMedia {
   content: string;
   category: string;
   coordinates: [number, number];
+  fileUrl?: string;
 }
 
 export const CACHE_KEY = "trace_last_known_location";

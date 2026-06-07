@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import SaveReviewModal from "@/components/trace/overlays/SaveReviewModal";
@@ -36,6 +36,61 @@ export default function TraceWorkspacePage() {
   const [replayBaseLocation, setReplayBaseLocation] = useState<[number, number] | null>(null);
   const [traceDistance, setTraceDistance] = useState("0.0 mi");
   const [traceDate, setTraceDate] = useState("");
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
+    const R = 6371000;
+    const dLat = ((coord2[1] - coord1[1]) * Math.PI) / 180;
+    const dLng = ((coord2[0] - coord1[0]) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((coord1[1] * Math.PI) / 180) *
+      Math.cos((coord2[1] * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const formatDistance = (coords: [number, number][]) => {
+    if (coords.length < 2) return "0.0 mi";
+    let totalMeters = 0;
+    for (let i = 1; i < coords.length; i++) {
+      totalMeters += getDistanceMeters(coords[i - 1], coords[i]);
+    }
+    const miles = totalMeters / 1609.344;
+    return `${miles.toFixed(1)} mi`;
+  };
+
+  // Pending media uploads keyed by waypoint id
+  // voice -> Blob, image -> data URL string
+  const pendingMediaRef = useRef<Map<string, Blob | string>>(new Map());
+
+  // Recalculate distance when trail changes
+  useEffect(() => {
+    setTraceDistance(formatDistance(trailCoordinates));
+  }, [trailCoordinates]);
+
+  const uploadFile = useCallback(async (
+    file: File,
+    traceId: string,
+    waypointId: string
+  ): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("traceId", traceId);
+    formData.append("waypointId", waypointId);
+
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.url || null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // --- 1. LIFE CYCLE SYSTEM: READ LOCAL STORAGE VS GENERATE FRESH ---
   useEffect(() => {
@@ -120,10 +175,10 @@ export default function TraceWorkspacePage() {
   // CRITICAL FIX: The GPS tracker is now allowed to run when idle to query the user's initial anchor dot frame
   const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage } = useGPSTracker(
     !isReplayMode, // Keeps checking GPS to display your real dot context cleanly
-    (coords: [number, number]) => {
+    (coords: [number, number], heading: number | null) => {
       if (!isReplayMode && isRecording) {
         // eslint-disable-next-line react-hooks/immutability
-        handleLocationStream(coords, null);
+        handleLocationStream(coords, heading);
       }
     },
     (updatedPath: [number, number][]) => {
@@ -173,8 +228,10 @@ export default function TraceWorkspacePage() {
 
   const handleSaveAudioMarker = (audioBlob: Blob, durationSec: number) => {
     const targetCoords = getCurrentCapturePoint();
+    const wpId = `wp-${Date.now()}`;
+    pendingMediaRef.current.set(wpId, audioBlob);
     const newMedia: WaypointMedia = {
-      id: `wp-${Date.now()}`,
+      id: wpId,
       type: "voice",
       content: `Voice Memo (${durationSec}s)`,
       category: "FINDING FRIENDS IN A CROWD",
@@ -186,8 +243,10 @@ export default function TraceWorkspacePage() {
 
   const handleSavePhotoMarker = (imageDataUrl: string) => {
     const targetCoords = getCurrentCapturePoint();
+    const wpId = `wp-${Date.now()}`;
+    pendingMediaRef.current.set(wpId, imageDataUrl);
     const newMedia: WaypointMedia = {
-      id: `wp-${Date.now()}`,
+      id: wpId,
       type: "image",
       content: imageDataUrl,
       category: "RUNNING WITH FRIENDS",
@@ -208,7 +267,41 @@ export default function TraceWorkspacePage() {
   };
 
   const handleCommitSaveTrace = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     setShowSaveReview(false);
+
+    try {
+      // 1. Upload any pending media files to Supabase Storage
+      const uploadPromises: Promise<void>[] = [];
+      for (const wp of savedMedia) {
+      const pendingData = pendingMediaRef.current.get(wp.id);
+      if (!pendingData) continue;
+
+      if (wp.type === "voice") {
+        const blob = pendingData as Blob;
+        const file = new File([blob], `voice-${wp.id}.webm`, { type: "audio/webm" });
+        uploadPromises.push(
+          uploadFile(file, id, wp.id).then((url) => {
+            if (url) wp.fileUrl = url;
+          })
+        );
+      } else if (wp.type === "image") {
+        const dataUrl = pendingData as string;
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `photo-${wp.id}.jpg`, { type: "image/jpeg" });
+        uploadPromises.push(
+          uploadFile(file, id, wp.id).then((url) => {
+            if (url) wp.fileUrl = url;
+          })
+        );
+      }
+    }
+
+    // Wait for all uploads to complete
+    await Promise.all(uploadPromises);
+    pendingMediaRef.current.clear();
 
     const dateString = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
     const newTrace = {
@@ -218,10 +311,10 @@ export default function TraceWorkspacePage() {
       date: dateString,
       coordinates: trailCoordinates,
       waypoints: savedMedia,
-      distance: trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi",
+      distance: traceDistance,
     };
 
-    // 1. Save to Supabase database first
+    // 2. Save to Supabase database
     try {
       const res = await fetch("/api/trace", {
         method: "POST",
@@ -238,7 +331,7 @@ export default function TraceWorkspacePage() {
       toast.error("Database Save Failed", "Your trace could not be saved to server database. Saving locally instead.");
     }
 
-    // 2. Save/register locally to trace ownership (needed for local dashboard)
+    // 3. Save/register locally to trace ownership (needed for local dashboard)
     try {
       const stored = localStorage.getItem("saved_traces");
       const savedTraces = stored ? JSON.parse(stored) : [];
@@ -255,6 +348,9 @@ export default function TraceWorkspacePage() {
 
     toast.success("Trace Saved Successfully", `"${traceTitleInput}" has been safely archived.`);
     router.push("/dashboard");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCloseSaveReview = () => {

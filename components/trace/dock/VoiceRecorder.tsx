@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Mic, Trash2, Lock, Unlock, Check } from "lucide-react";
 
 interface VoiceRecorderProps {
@@ -20,13 +20,22 @@ export default function VoiceRecorder({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  
   const recTimeRef = useRef(0);
   const isRecordingIntentRef = useRef(false);
+  const hasSavedRef = useRef(false);
+
+  const cleanupAudioTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
   // --- AUDIO PIPELINE ENGINE ---
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
+    if (isRecordingIntentRef.current) return;
     isRecordingIntentRef.current = true;
+    hasSavedRef.current = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (!isRecordingIntentRef.current) {
@@ -41,9 +50,10 @@ export default function VoiceRecorder({
       };
 
       mediaRecorderRef.current.onstop = () => {
+        if (hasSavedRef.current) return;
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const duration = recTimeRef.current;
-        if (audioChunksRef.current.length > 0 && duration > 0) {
+        if (audioChunksRef.current.length > 0 && duration > 0.5) {
           onAudioRecorded?.(audioBlob, duration);
         }
         stream.getTracks().forEach((track) => track.stop());
@@ -64,9 +74,11 @@ export default function VoiceRecorder({
       console.error("Audio recording system initialization error:", err);
       isRecordingIntentRef.current = false;
     }
-  };
+  }, [onAudioRecorded, onStateChange]);
 
-  const stopAndSaveRecording = () => {
+  const stopAndSaveRecording = useCallback(() => {
+    if (hasSavedRef.current) return;
+    hasSavedRef.current = true;
     isRecordingIntentRef.current = false;
     cleanupAudioTimer();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
@@ -74,40 +86,50 @@ export default function VoiceRecorder({
     }
     onStateChange("idle");
     setIsLocked(false);
-  };
+  }, [cleanupAudioTimer, onStateChange]);
 
-  const cancelRecording = () => {
+  const cancelRecording = useCallback(() => {
+    hasSavedRef.current = true;
     isRecordingIntentRef.current = false;
     cleanupAudioTimer();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.onstop = null; // Discard chunks cleanly
+      mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current.stop();
     }
     onStateChange("idle");
     setIsLocked(false);
-  };
+  }, [cleanupAudioTimer, onStateChange]);
 
-  const cleanupAudioTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-  };
+  // Global pointerup handler to catch releases outside the button
+  useEffect(() => {
+    if (!isActive) return;
+    const handlePointerUp = () => {
+      if (!isLocked) {
+        stopAndSaveRecording();
+      }
+    };
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => window.removeEventListener("pointerup", handlePointerUp);
+  }, [isActive, isLocked, stopAndSaveRecording]);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cleanupAudioTimer();
+      isRecordingIntentRef.current = false;
     };
-  }, []);
+  }, [cleanupAudioTimer]);
 
   // --- GESTURE CAPTURE MECHANISMS ---
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    touchStartY.current = e.clientY;
     startRecording();
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (!isActive) return;
-    const currentY = e.touches[0].clientY;
-    const distanceSwipedUp = touchStartY.current - currentY;
-
+    const distanceSwipedUp = touchStartY.current - e.clientY;
     if (distanceSwipedUp > 60) {
       onStateChange("locked-recording");
       setIsLocked(true);
@@ -123,11 +145,9 @@ export default function VoiceRecorder({
   if (!isActive) {
     return (
       <button
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onMouseDown={startRecording}
-        onMouseUp={stopAndSaveRecording}
-        className="group w-12 h-12 rounded-[18px] bg-white border border-black/[0.05] shadow-sm flex flex-col items-center justify-center active:scale-90 transition-all duration-200 select-none cursor-pointer hover:bg-black/[0.02]"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        className="group w-12 h-12 rounded-[18px] bg-white border border-black/[0.05] shadow-sm flex flex-col items-center justify-center active:scale-90 transition-all duration-200 select-none cursor-pointer hover:bg-black/[0.02] touch-none"
         title="Hold to Record, swipe up to lock"
       >
         <Mic className="w-[19px] h-[19px] text-black/70 stroke-[2.3]" />
