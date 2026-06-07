@@ -40,44 +40,80 @@ export default function TraceWorkspacePage() {
   // --- 1. LIFE CYCLE SYSTEM: READ LOCAL STORAGE VS GENERATE FRESH ---
   useEffect(() => {
     if (!id) return;
-    try {
-      const stored = localStorage.getItem("saved_traces");
-      if (stored) {
-        const traces = JSON.parse(stored);
-        const savedTrace = traces.find((t: { id: string }) => t.id === id);
+    
+    async function loadTrace() {
+      try {
+        // 1. Try local storage first (instant client cache)
+        const stored = localStorage.getItem("saved_traces");
+        if (stored) {
+          const traces = JSON.parse(stored);
+          const savedTrace = traces.find((t: { id: string }) => t.id === id);
 
-        if (savedTrace) {
-          // SCENARIO A: Found existing track file records in client database
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setIsReplayMode(true);
-          setTraceTitleInput(savedTrace.title);
-          if (savedTrace.coordinates && savedTrace.coordinates.length > 0) {
-            setTrailCoordinates(savedTrace.coordinates);
-            setReplayBaseLocation(savedTrace.coordinates[0]);
+          if (savedTrace) {
+            setIsReplayMode(true);
+            setTraceTitleInput(savedTrace.title);
+            if (savedTrace.coordinates && savedTrace.coordinates.length > 0) {
+              setTrailCoordinates(savedTrace.coordinates);
+              setReplayBaseLocation(savedTrace.coordinates[0]);
+            }
+            if (savedTrace.waypoints) {
+              setSavedMedia(savedTrace.waypoints);
+            }
+            if (savedTrace.distance) {
+              setTraceDistance(savedTrace.distance);
+            }
+            if (savedTrace.date) {
+              setTraceDate(savedTrace.date);
+            }
+            setShowSaveReview(false);
+            return;
           }
-          if (savedTrace.waypoints) {
-            setSavedMedia(savedTrace.waypoints);
-          }
-          if (savedTrace.distance) {
-            setTraceDistance(savedTrace.distance);
-          }
-          if (savedTrace.date) {
-            setTraceDate(savedTrace.date);
-          }
-          setShowSaveReview(false);
-          return;
         }
-      }
 
-      // SCENARIO B: Brand new URL identifier link. Ready input states
-      setIsReplayMode(false);
-      setShowSaveReview(false);
-      setTrailCoordinates([]);
-      setSavedMedia([]);
-      setTraceTitleInput("Fresh Location Trace");
-    } catch (e) {
-      console.error("Error evaluating trace context state:", e);
+        // 2. Not in local storage — try fetching from Supabase
+        const res = await fetch(`/api/trace/${id}`);
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data) {
+            const fetchedTrace = result.data;
+            setIsReplayMode(true);
+            setTraceTitleInput(fetchedTrace.title);
+            if (fetchedTrace.coordinates && fetchedTrace.coordinates.length > 0) {
+              setTrailCoordinates(fetchedTrace.coordinates);
+              setReplayBaseLocation(fetchedTrace.coordinates[0]);
+            }
+            if (fetchedTrace.waypoints) {
+              setSavedMedia(fetchedTrace.waypoints);
+            }
+            if (fetchedTrace.distance) {
+              setTraceDistance(fetchedTrace.distance);
+            }
+            if (fetchedTrace.date) {
+              setTraceDate(fetchedTrace.date);
+            }
+            setShowSaveReview(false);
+            return;
+          }
+        }
+
+        // 3. Brand new URL identifier link
+        setIsReplayMode(false);
+        setShowSaveReview(false);
+        setTrailCoordinates([]);
+        setSavedMedia([]);
+        setTraceTitleInput("Fresh Location Trace");
+      } catch (e) {
+        console.error("Error evaluating trace context state:", e);
+        // Fallback to fresh trace
+        setIsReplayMode(false);
+        setShowSaveReview(false);
+        setTrailCoordinates([]);
+        setSavedMedia([]);
+        setTraceTitleInput("Fresh Location Trace");
+      }
     }
+
+    loadTrace();
   }, [id]);
 
   // Engine Connection #2: Hardware device telemetry location tracking engine
@@ -171,31 +207,47 @@ export default function TraceWorkspacePage() {
     }
   };
 
-  const handleCommitSaveTrace = () => {
+  const handleCommitSaveTrace = async () => {
     setShowSaveReview(false);
 
+    const dateString = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const newTrace = {
+      id: id,
+      title: traceTitleInput || "Unfinished Trail Trace",
+      link: `${window.location.origin}/trace/${id}`,
+      date: dateString,
+      coordinates: trailCoordinates,
+      waypoints: savedMedia,
+      distance: trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi",
+    };
+
+    // 1. Save to Supabase database first
+    try {
+      const res = await fetch("/api/trace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTrace),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to persist to database");
+      }
+    } catch (err: any) {
+      console.error("Error saving trace to Supabase:", err);
+      toast.error("Database Save Failed", "Your trace could not be saved to server database. Saving locally instead.");
+    }
+
+    // 2. Save/register locally to trace ownership (needed for local dashboard)
     try {
       const stored = localStorage.getItem("saved_traces");
       const savedTraces = stored ? JSON.parse(stored) : [];
-      const dateString = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-
-      const newTrace = {
-        id: id, // Explicitly binds to the exact dynamic folder token link inside address bar
-        title: traceTitleInput || "Unfinished Trail Trace",
-        link: `${window.location.origin}/trace/${id}`,
-        date: dateString,
-        coordinates: trailCoordinates,
-        waypoints: savedMedia,
-        distance: trailCoordinates.length > 0 ? "0.2 mi" : "0.0 mi",
-      };
-
       const existingIndex = savedTraces.findIndex((t: { id: string }) => t.id === newTrace.id);
       if (existingIndex > -1) {
         savedTraces[existingIndex] = newTrace;
       } else {
         savedTraces.unshift(newTrace);
       }
-
       localStorage.setItem("saved_traces", JSON.stringify(savedTraces));
     } catch (e) {
       console.error("Error saving trace to localStorage:", e);
