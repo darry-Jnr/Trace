@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import PendoPageTracker from "@/components/PendoPageTracker";
 
 export const metadata: Metadata = {
   title: "Trace — Show people exactly where to go.",
@@ -58,6 +59,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <ToastProvider>
+          <PendoPageTracker />
           {children}
         </ToastProvider>
         <Script id="pendo-install" strategy="afterInteractive">{`
