@@ -39,6 +39,7 @@ export default function TraceWorkspacePage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<string>("");
+  const [showStartHint, setShowStartHint] = useState(false);
 
   const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
     const R = 6371000;
@@ -401,6 +402,25 @@ export default function TraceWorkspacePage() {
   const showInitialLoader = isReplayMode ? !replayBaseLocation : gpsLoading;
   const loadingMessageStr = isReplayMode ? "Loading saved trace..." : loadingMessage;
 
+  // Onboarding hint logic
+  useEffect(() => {
+    if (!showInitialLoader && !isReplayMode && !isRecording) {
+      const timer = setTimeout(() => setShowStartHint(true), 800);
+      return () => clearTimeout(timer);
+    }
+    setShowStartHint(false);
+  }, [showInitialLoader, isReplayMode, isRecording]);
+
+  useEffect(() => {
+    if (!showStartHint) return;
+    const timer = setTimeout(() => setShowStartHint(false), 6000);
+    return () => clearTimeout(timer);
+  }, [showStartHint]);
+
+  useEffect(() => {
+    if (isRecording) setShowStartHint(false);
+  }, [isRecording]);
+
   return (
     <div className="relative flex w-screen h-screen overflow-hidden bg-[#f5f5f7] font-sans selection:bg-black selection:text-white">
       <div className="relative flex-1 h-full min-w-0 transition-all duration-300 z-0 [&_.mapboxgl-ctrl-logo]:hidden [&_.mapboxgl-ctrl-attrib]:hidden">
@@ -430,17 +450,29 @@ export default function TraceWorkspacePage() {
 
         {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
         {!showInitialLoader && !isReplayMode && (
-          <ControlDeck
-            viewMode={viewMode}
-            isRecording={isRecording}
-            isAddMenuOpen={isAddMenuOpen}
-            onToggleView={toggleViewPerspective}
-            onToggleRecord={handleToggleRecord}
-            onToggleAddMenu={() => setIsAddMenuOpen(!isAddMenuOpen)}
-            onSendText={handleSaveTextMarker}
-            onAudioRecorded={handleSaveAudioMarker}
-            onPhotoCaptured={handleSavePhotoMarker}
-          />
+          <>
+            <ControlDeck
+              viewMode={viewMode}
+              isRecording={isRecording}
+              isAddMenuOpen={isAddMenuOpen}
+              onToggleView={toggleViewPerspective}
+              onToggleRecord={handleToggleRecord}
+              onToggleAddMenu={() => setIsAddMenuOpen(!isAddMenuOpen)}
+              onSendText={handleSaveTextMarker}
+              onAudioRecorded={handleSaveAudioMarker}
+              onPhotoCaptured={handleSavePhotoMarker}
+            />
+
+            {/* Onboarding hint — points at the Start button */}
+            {showStartHint && !isRecording && (
+              <div className="absolute right-[72px] top-1/2 -translate-y-1/2 z-40 pointer-events-none animate-fade-in">
+                <div className="relative px-4 py-2.5 rounded-2xl bg-black text-white text-xs font-medium tracking-tight shadow-lg whitespace-nowrap">
+                  <span>Tap Start to begin tracing your route</span>
+                  <div className="absolute right-[-6px] top-1/2 -translate-y-1/2 w-3 h-3 bg-black rotate-45" />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

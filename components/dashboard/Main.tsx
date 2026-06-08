@@ -233,8 +233,24 @@ const Main = () => {
                                 </div>
                             )
                         ) : (
-                            <div className="space-y-4 animate-pulse">
-                                <div className="w-full h-[82px] bg-black/[0.03] rounded-[24px] border border-black/[0.02]" />
+                            <div className="space-y-4">
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="w-full flex items-center justify-between p-5 rounded-[24px] border border-black/[0.05] bg-white animate-pulse">
+                                        <div className="flex items-center min-w-0 flex-1">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="h-4 w-3/5 bg-black/[0.06] rounded-full" />
+                                                <div className="flex items-center gap-3 mt-3">
+                                                    <div className="h-3 w-2/5 bg-black/[0.04] rounded-full" />
+                                                    <div className="h-3 w-16 bg-black/[0.04] rounded-full" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                                            <div className="w-10 h-10 rounded-full bg-black/[0.04]" />
+                                            <div className="w-10 h-10 rounded-full bg-black/[0.04]" />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -250,20 +266,41 @@ const Main = () => {
                     </div>
 
                     <div className="space-y-4">
-                        {recentTraces.map((trace) => (
-                            <TraceCard
-                                key={trace.id}
-                                title={trace.title}
-                                link={trace.link}
-                                date={trace.date}
-                                isRecent
-                                onShare={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/trace/${trace.id}`);
-                                    toast.success("Link Copied", "Trace link copied to clipboard.");
-                                }}
-                                onClick={() => router.push(`/trace/${trace.id}`)}
-                            />
-                        ))}
+                        {!isLoaded ? (
+                            <div className="space-y-4">
+                                {[1, 2].map((i) => (
+                                    <div key={i} className="w-full flex items-center justify-between p-5 rounded-[24px] border border-black/[0.05] bg-[#efefec] animate-pulse">
+                                        <div className="flex items-center min-w-0 flex-1">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="h-4 w-2/5 bg-black/[0.06] rounded-full" />
+                                                <div className="flex items-center gap-3 mt-3">
+                                                    <div className="h-3 w-1/3 bg-black/[0.04] rounded-full" />
+                                                    <div className="h-3 w-14 bg-black/[0.04] rounded-full" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                                            <div className="w-10 h-10 rounded-full bg-black/[0.04]" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            recentTraces.map((trace) => (
+                                <TraceCard
+                                    key={trace.id}
+                                    title={trace.title}
+                                    link={trace.link}
+                                    date={trace.date}
+                                    isRecent
+                                    onShare={() => {
+                                        navigator.clipboard.writeText(`${window.location.origin}/trace/${trace.id}`);
+                                        toast.success("Link Copied", "Trace link copied to clipboard.");
+                                    }}
+                                    onClick={() => router.push(`/trace/${trace.id}`)}
+                                />
+                            ))
+                        )}
                     </div>
                 </section>
             </div>
