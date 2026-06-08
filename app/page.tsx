@@ -47,6 +47,7 @@ export default function LandingPage() {
   const handleStartTrace = useCallback(() => {
     if (startingTrace) return;
     setStartingTrace(true);
+    (window as any).pendo?.track('Start Trace CTA Clicked', { source: 'landing_page' });
     const newId = Math.random().toString(36).substring(2, 9);
     setTimeout(() => router.push(`/trace/${newId}`), 500);
   }, [startingTrace]);
