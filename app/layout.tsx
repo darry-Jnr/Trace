@@ -55,7 +55,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script id="pendo-install" strategy="beforeInteractive">{`
+      </head>
+      <body className="antialiased">
+        <ToastProvider>
+          {children}
+        </ToastProvider>
+        <Script id="pendo-install" strategy="afterInteractive">{`
 (function(apiKey){
     (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];
     v=['initialize','identify','updateOptions','pageLoad','track', 'trackAgent'];for(w=0,x=v.length;w<x;++w)(function(m){
@@ -64,7 +69,7 @@ export default function RootLayout({
     z=e.getElementsByTagName(n)[0];z.parentNode.insertBefore(y,z);})(window,document,'script','pendo');
 })('79b4ac85-fc1f-4697-8874-a3605978de4a');
         `}</Script>
-        <Script id="pendo-init" strategy="beforeInteractive">{`
+        <Script id="pendo-init" strategy="afterInteractive">{`
 (function() {
   var vid = localStorage.getItem('pendo_visitor_id');
   if (!vid) {
@@ -76,11 +81,6 @@ export default function RootLayout({
   });
 })();
         `}</Script>
-      </head>
-      <body className="antialiased">
-        <ToastProvider>
-          {children}
-        </ToastProvider>
       </body>
     </html>
   );
