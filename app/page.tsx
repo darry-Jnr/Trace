@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { LoaderCircle } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/landing/Navbar";
@@ -41,11 +42,14 @@ const SCENARIOS: Scenario[] = [
 export default function LandingPage() {
   const router = useRouter();
   const [active, setActive] = useState("concert");
+  const [startingTrace, setStartingTrace] = useState(false);
 
-  const handleStartTrace = () => {
+  const handleStartTrace = useCallback(() => {
+    if (startingTrace) return;
+    setStartingTrace(true);
     const newId = Math.random().toString(36).substring(2, 9);
-    router.push(`/trace/${newId}`);
-  };
+    setTimeout(() => router.push(`/trace/${newId}`), 500);
+  }, [startingTrace]);
 
   const current = SCENARIOS.find((item) => item.id === active) || SCENARIOS[0];
 
@@ -54,8 +58,8 @@ export default function LandingPage() {
       <Navbar />
 
       <main className="flex-1 overflow-hidden">
-        <section className="px-6 md:px-10 pt-16 md:pt-24 pb-24">
-          <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+        <section className="px-6 md:px-10 pt-12 md:pt-24 pb-24">
+          <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-24 items-center">
 
             {/* LEFT COLUMN: Hero Copy & Features */}
             <div className="max-w-xl">
@@ -70,19 +74,23 @@ export default function LandingPage() {
               </h1>
 
               {/* Description */}
-              <p className="mt-7 text-lg text-black/60 font-medium leading-relaxed tracking-tight">
+              <p className="mt-5 lg:mt-7 text-base lg:text-lg text-black/60 font-medium leading-relaxed tracking-tight">
                 Walk the route once, leave photos, notes, or voice messages
                 along the way, and share a single link. Friends follow your
                 exact path and see everything at the right moments.
               </p>
 
               {/* Action Buttons (Using Custom Style Framework) */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-10">
+              <div className="flex flex-col sm:flex-row gap-3 mt-6 lg:mt-10">
                 <button
                   onClick={handleStartTrace}
-                  className="rounded-[16px] px-7 h-13 bg-black text-white text-sm font-medium flex items-center justify-center shadow-none transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  disabled={startingTrace}
+                  className="rounded-[16px] px-7 h-13 bg-black text-white text-sm font-medium flex items-center justify-center gap-2 shadow-none transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-80"
                 >
-                  Start a Trace
+                  {startingTrace ? (
+                    <LoaderCircle className="w-4 h-4 animate-spin" />
+                  ) : null}
+                  <span>{startingTrace ? "Starting..." : "Start a Trace"}</span>
                 </button>
 
                 <button className="rounded-[16px] px-7 h-13 border border-black/10 bg-white text-black text-sm font-medium flex items-center justify-center transition-all hover:bg-black/[0.02] active:scale-[0.99]">
@@ -91,7 +99,7 @@ export default function LandingPage() {
               </div>
 
               {/* Steps Timeline Layout */}
-              <div className="mt-20 space-y-8 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-[1px] before:bg-black/[0.06]">
+              <div className="mt-10 lg:mt-20 space-y-6 lg:space-y-8 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-[1px] before:bg-black/[0.06]">
                 <div className="flex gap-5 relative z-10">
                   <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-sm">
                     1
@@ -133,7 +141,7 @@ export default function LandingPage() {
             {/* RIGHT COLUMN: Interactive Device Preview Frame */}
             <div className="flex flex-col items-center">
               {/* Dynamic Interactive Scenario Tabs */}
-              <div className="flex gap-1.5 bg-white p-1 rounded-full border border-black/[0.04] mb-8 overflow-x-auto max-w-full shadow-sm">
+              <div className="flex gap-1.5 bg-white p-1 rounded-full border border-black/[0.04] mb-6 lg:mb-8 overflow-x-auto max-w-full shadow-sm">
                 {SCENARIOS.map((scenario) => (
                   <button
                     key={scenario.id}
@@ -286,6 +294,21 @@ export default function LandingPage() {
       </main>
 
       <Footer />
+
+      {/* Start Trace transition overlay */}
+      {startingTrace && (
+        <div className="fixed inset-0 z-[100] pointer-events-none animate-fade-in">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0052FF] via-[#4f8cff] to-[#a8c8ff] opacity-90" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.3),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(0,82,255,0.4),transparent_60%)]" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              <p className="text-white/80 text-sm font-medium tracking-tight">Preparing your trace...</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -451,6 +451,20 @@ export default function TraceWorkspacePage() {
         {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
         {!showInitialLoader && !isReplayMode && (
           <>
+            {/* Back button — top-left, visible before recording starts */}
+            {!isRecording && (
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="absolute top-5 left-5 z-40 w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
+                title="Back to dashboard"
+              >
+                <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 12H5" />
+                  <path d="M12 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+
             <ControlDeck
               viewMode={viewMode}
               isRecording={isRecording}

@@ -37,27 +37,21 @@ export default function ControlDeck({
 }: ControlDeckProps) {
   return (
     <>
-      {/* Floating Side Controls */}
+      {/* Map View Toggle — top-right, subtle */}
+      <button
+        onClick={onToggleView}
+        className="group absolute top-5 right-5 z-40 w-10 h-10 rounded-full border border-black/[0.06] flex items-center justify-center active:scale-90 transition-all duration-200"
+        title={viewMode === "flat" ? "Switch to 3D" : "Switch to 2D"}
+      >
+        {viewMode === "flat" ? (
+          <Mountain className="w-[18px] h-[18px] text-black/30 group-hover:text-black/60 transition-colors duration-200" />
+        ) : (
+          <Map className="w-[18px] h-[18px] text-black/30 group-hover:text-black/60 transition-colors duration-200" />
+        )}
+      </button>
+
+      {/* Floating Side Controls — right */}
       <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-3">
-
-        {/* Map View Toggle */}
-        <button
-          onClick={onToggleView}
-          className="group relative w-[58px] h-[58px] rounded-[22px] bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200"
-        >
-          {/* Light reflection */}
-          <div className="absolute inset-0 rounded-[22px] bg-gradient-to-b from-white/60 to-transparent pointer-events-none" />
-
-          {viewMode === "flat" ? (
-            <Mountain className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors duration-200" />
-          ) : (
-            <Map className="w-[18px] h-[18px] text-black/70 group-hover:text-black transition-colors duration-200" />
-          )}
-
-          <span className="mt-1 text-[9px] font-semibold tracking-tight text-black/40">
-            {viewMode === "flat" ? "3D" : "2D"}
-          </span>
-        </button>
 
         {/* Start / Stop */}
         <button
