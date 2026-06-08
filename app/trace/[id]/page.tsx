@@ -162,6 +162,7 @@ export default function TraceWorkspacePage() {
               setTraceDate(fetchedTrace.date);
             }
             setShowSaveReview(false);
+            (window as any).pendo?.track('Trace Opened', { traceId: id, source: 'shared_link' });
             return;
           }
         }
@@ -239,6 +240,7 @@ export default function TraceWorkspacePage() {
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
+    (window as any).pendo?.track('Moment Added', { type: 'text', traceId: id });
   };
 
   const handleSaveAudioMarker = (audioBlob: Blob, durationSec: number) => {
@@ -254,7 +256,8 @@ export default function TraceWorkspacePage() {
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
-  }; 
+    (window as any).pendo?.track('Moment Added', { type: 'voice', duration: durationSec, traceId: id });
+  };
 
   const handleSavePhotoMarker = (imageDataUrl: string) => {
     const targetCoords = getCurrentCapturePoint();
@@ -269,6 +272,7 @@ export default function TraceWorkspacePage() {
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
+    (window as any).pendo?.track('Moment Added', { type: 'image', traceId: id });
   };
 
   const handleToggleRecord = () => {
@@ -351,6 +355,7 @@ export default function TraceWorkspacePage() {
         const errorData = await res.json();
         throw new Error(errorData.error || "Failed to persist to database");
       }
+      (window as any).pendo?.track('Trace Saved', { traceId: id, title: traceTitleInput, waypointCount: savedMedia.length, distance: traceDistance });
     } catch (err: any) {
       console.error("Error saving trace to Supabase:", err);
       toast.error("Database Save Failed", "Your trace could not be saved to server database. Saving locally instead.");
