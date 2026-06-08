@@ -5,11 +5,13 @@ import { useState, useEffect, useRef } from "react";
 interface InitialLoaderProps {
   isLoading: boolean;
   loadingMessage: string;
+  onRetry?: () => void;
 }
 
 export default function InitialLoader({
   isLoading,
   loadingMessage,
+  onRetry,
 }: InitialLoaderProps) {
   const [visible, setVisible] = useState(true);
   const [fadingOut, setFadingOut] = useState(false);
@@ -92,9 +94,21 @@ export default function InitialLoader({
           </h2>
 
           <p className="mt-1 text-[12px] font-medium tracking-tight text-black/35">
-            Preparing your trace
+            {loadingMessage === "Could not find location" ? "GPS signal not found" : "Preparing your trace"}
           </p>
 
+          {loadingMessage === "Could not find location" && onRetry && (
+            <button
+              onClick={onRetry}
+              className="mt-6 px-6 h-11 rounded-[16px] bg-black text-white text-sm font-medium flex items-center justify-center gap-2 shadow-none transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              <span>Retry</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { LoadingStage, CACHE_KEY } from "@/types";
 
 const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
@@ -26,6 +26,14 @@ export function useGPSTracker(
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<LoadingStage>("booting");
+  const [hasGpsFix, setHasGpsFix] = useState(false);
+  const [gpsRetryCount, setGpsRetryCount] = useState(0);
+
+  const retryGps = useCallback(() => {
+    setGpsRetryCount((c) => c + 1);
+    setHasGpsFix(false);
+    setLoadingStage("searching");
+  }, []);
 
   const isRecordingRef = useRef(isRecording);
   const pathCoordsRef = useRef<[number, number][]>([]);
@@ -117,6 +125,7 @@ export function useGPSTracker(
         smoothedCoordsRef.current = finalCoords;
 
         setUserLocation(finalCoords);
+        setHasGpsFix(true);
 
         // Callback outside state updater — no more side effects inside setUserLocation
         onLocationUpdateRef.current(finalCoords, heading);
@@ -160,7 +169,7 @@ export function useGPSTracker(
     };
     // FIX #2: Empty deps — callbacks are accessed via stable refs,
     // so this effect runs exactly once and the watch is never torn down.
-  }, []);
+  }, [gpsRetryCount]);
 
-  return { baseLocation, userLocation, isLoading, loadingStage };
+  return { baseLocation, userLocation, isLoading, loadingStage, hasGpsFix, retryGps };
 }

@@ -12,8 +12,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    if (!traceId || !waypointId) {
+      return NextResponse.json({ error: "Missing traceId or waypointId" }, { status: 400 });
+    }
+
     const fileExt = file.name.split(".").pop() || "webm";
-    const fileName = `${traceId || "unknown"}/${waypointId || Date.now()}.${fileExt}`;
+    const fileName = `${traceId}/${waypointId}.${fileExt}`;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);

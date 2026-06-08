@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase
       .from("traces")
-      .select("id, title, distance, date")
+      .select("id, title, link, distance, date")
       .in("id", ids);
 
     if (error) {

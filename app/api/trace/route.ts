@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { id, title, coordinates, waypoints, distance, date } = body;
+    const { id, title, link, coordinates, waypoints, distance, date } = body;
 
     if (!id || !title || !date) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -15,6 +15,7 @@ export async function POST(request: Request) {
       .upsert({
         id,
         title,
+        link,
         coordinates,
         waypoints,
         distance,

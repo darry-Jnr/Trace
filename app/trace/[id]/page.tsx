@@ -40,6 +40,8 @@ export default function TraceWorkspacePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<string>("");
   const [showStartHint, setShowStartHint] = useState(false);
+  const [gpsTimedOut, setGpsTimedOut] = useState(false);
+  const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
     const R = 6371000;
@@ -189,10 +191,10 @@ export default function TraceWorkspacePage() {
 
   // Engine Connection #2: Hardware device telemetry location tracking engine
   // CRITICAL FIX: The GPS tracker is now allowed to run when idle to query the user's initial anchor dot frame
-  const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage } = useGPSTracker(
-    !isReplayMode, // Keeps checking GPS to display your real dot context cleanly
+  const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, retryGps } = useGPSTracker(
+    !isReplayMode,
     (coords: [number, number], heading: number | null) => {
-      if (!isReplayMode && isRecording) {
+      if (!isReplayMode) {
         // eslint-disable-next-line react-hooks/immutability
         handleLocationStream(coords, heading);
       }
@@ -404,8 +406,12 @@ export default function TraceWorkspacePage() {
     done: "Location connected",
   }[loadingStage];
 
-  const showInitialLoader = isReplayMode ? !replayBaseLocation : gpsLoading;
-  const loadingMessageStr = isReplayMode ? "Loading saved trace..." : loadingMessage;
+  const showInitialLoader = isReplayMode
+    ? !replayBaseLocation
+    : (gpsLoading || (!hasGpsFix && !gpsTimedOut));
+  const loadingMessageStr = isReplayMode
+    ? "Loading saved trace..."
+    : (gpsTimedOut ? "Could not find location" : loadingMessage);
 
   // Onboarding hint logic
   useEffect(() => {
@@ -456,18 +462,31 @@ export default function TraceWorkspacePage() {
         {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
         {!showInitialLoader && !isReplayMode && (
           <>
-            {/* Back button — top-left, visible before recording starts */}
+            {/* Top-left button group */}
             {!isRecording && (
-              <button
-                onClick={() => router.push("/dashboard")}
-                className="absolute top-5 left-5 z-40 w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
-                title="Back to dashboard"
-              >
-                <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 12H5" />
-                  <path d="M12 19l-7-7 7-7" />
-                </svg>
-              </button>
+              <div className="absolute top-5 left-5 z-40 flex items-center gap-2">
+                <button
+                  onClick={() => router.push("/dashboard")}
+                  className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
+                  title="Back to dashboard"
+                >
+                  <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 12H5" />
+                    <path d="M12 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={() => userLocation && centerOnCoords(userLocation)}
+                  className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
+                  title="Re-center on my location"
+                >
+                  <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                  </svg>
+                </button>
+              </div>
             )}
 
             <ControlDeck
@@ -481,6 +500,32 @@ export default function TraceWorkspacePage() {
               onAudioRecorded={handleSaveAudioMarker}
               onPhotoCaptured={handleSavePhotoMarker}
             />
+
+            {/* Location status banner — visible until GPS locks */}
+            {!hasGpsFix && !gpsTimedOut && (
+              <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 animate-fade-in">
+                <div className="px-4 py-2 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex items-center gap-2.5">
+                  <span className="relative flex w-2 h-2">
+                    <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-[#0052FF] opacity-75" />
+                    <span className="relative inline-flex w-2 h-2 rounded-full bg-[#0052FF]" />
+                  </span>
+                  <span className="text-[12px] font-medium text-black/60 tracking-tight">Finding your location...</span>
+                </div>
+              </div>
+            )}
+            {gpsTimedOut && !hasGpsFix && (
+              <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 animate-fade-in">
+                <div className="px-4 py-2 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex items-center gap-2.5">
+                  <span className="text-[12px] font-medium text-black/40 tracking-tight">Location unavailable</span>
+                  <button
+                    onClick={retryGps}
+                    className="text-[12px] font-semibold text-[#0052FF] hover:text-black transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Onboarding hint — points at the Start button */}
             {showStartHint && !isRecording && (
@@ -512,7 +557,7 @@ export default function TraceWorkspacePage() {
       )}
 
       {/* BLOCKING HARDWARE LOADING TIMELINE MASK */}
-      <InitialLoader isLoading={showInitialLoader} loadingMessage={loadingMessageStr} />
+      <InitialLoader isLoading={showInitialLoader} loadingMessage={loadingMessageStr} onRetry={gpsTimedOut ? retryGps : undefined} />
     </div>
   );
 }
