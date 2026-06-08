@@ -55,7 +55,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* The exact Pendo script Novus needs to track everything */}
         <Script id="pendo-install" strategy="beforeInteractive">{`
 (function(apiKey){
     (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];
@@ -66,11 +65,16 @@ export default function RootLayout({
 })('79b4ac85-fc1f-4697-8874-a3605978de4a');
         `}</Script>
         <Script id="pendo-init" strategy="beforeInteractive">{`
-pendo.initialize({
-  visitor: {
-    id: ''
+(function() {
+  var vid = localStorage.getItem('pendo_visitor_id');
+  if (!vid) {
+    vid = 'v_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    localStorage.setItem('pendo_visitor_id', vid);
   }
-});
+  pendo.initialize({
+    visitor: { id: vid }
+  });
+})();
         `}</Script>
       </head>
       <body className="antialiased">
