@@ -86,6 +86,7 @@ export default function LandingPage() {
                 <button
                   onClick={handleStartTrace}
                   disabled={startingTrace}
+                  data-pendo="start-trace-cta"
                   className="rounded-[16px] px-7 h-13 bg-black text-white text-sm font-medium flex items-center justify-center gap-2 shadow-none transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-80"
                 >
                   {startingTrace ? (
@@ -94,7 +95,7 @@ export default function LandingPage() {
                   <span>{startingTrace ? "Starting..." : "Start a Trace"}</span>
                 </button>
 
-                <button className="rounded-[16px] px-7 h-13 border border-black/10 bg-white text-black text-sm font-medium flex items-center justify-center transition-all hover:bg-black/[0.02] active:scale-[0.99]">
+                <button data-pendo="watch-demo-btn" className="rounded-[16px] px-7 h-13 border border-black/10 bg-white text-black text-sm font-medium flex items-center justify-center transition-all hover:bg-black/[0.02] active:scale-[0.99]">
                   Watch demo
                 </button>
               </div>

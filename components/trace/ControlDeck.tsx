@@ -56,6 +56,7 @@ export default function ControlDeck({
         {/* Start / Stop */}
         <button
           onClick={onToggleRecord}
+          data-pendo="record-btn"
           className={`group relative w-[58px] h-[58px] rounded-[22px] backdrop-blur-2xl border shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200 overflow-hidden ${
             isRecording
               ? "bg-black border-black text-white"

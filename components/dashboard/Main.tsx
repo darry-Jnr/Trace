@@ -79,6 +79,7 @@ const Main = () => {
 
     const handleNewTrace = () => {
         const newId = Math.random().toString(36).substring(2, 9);
+        (window as any).pendo?.track('New Trace Started', { source: 'dashboard' });
         router.push(`/trace/${newId}`);
     };
 
@@ -131,6 +132,7 @@ const Main = () => {
                     fetch(`/api/trace/${id}`, { method: "DELETE" })
                 )
             );
+            (window as any).pendo?.track('Trace Deleted', { count: idsToDelete.length });
             toast.success("Traces Deleted", "The selected trace records have been deleted successfully.");
         } catch (err) {
             console.error("Supabase deletion error:", err);
@@ -183,6 +185,7 @@ const Main = () => {
                             
                             <Button
                                 onClick={handleNewTrace}
+                                data-pendo="new-trace-btn"
                                 className="rounded-[16px] px-6 h-12 flex items-center gap-2 shadow-none hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                             >
                                 <Plus className="w-4 h-4 shrink-0" />
@@ -221,6 +224,7 @@ const Main = () => {
                                         onShare={() => {
                                             navigator.clipboard.writeText(trace.link);
                                             toast.success("Link Copied", "Trace link copied to clipboard.");
+                                            (window as any).pendo?.track('Trace Shared', { traceId: trace.id });
                                         }}
                                         onClick={() => router.push(`/trace/${trace.id}`)}
                                     />

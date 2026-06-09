@@ -329,10 +329,12 @@ export default function TraceWorkspacePage() {
     if (isRecording) {
       setIsRecording(false);
       setShowSaveReview(true);
+      (window as any).pendo?.track('Recording Stopped', { traceId: id, waypointCount: savedMedia.length });
     } else {
       setIsRecording(true);
       setIsAddMenuOpen(false);
       setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
+      (window as any).pendo?.track('Recording Started', { traceId: id });
     }
   };
 
