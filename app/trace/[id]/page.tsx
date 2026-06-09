@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import SaveReviewModal from "@/components/trace/overlays/SaveReviewModal";
 
 import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
+import { useReplayGuidance } from "@/hooks/trace/useReplayGuidance";
 import { useMapEngine } from "@/hooks/trace/useMapEngine";
 import { WaypointMedia } from "@/types";
 
@@ -128,6 +129,7 @@ export default function TraceWorkspacePage() {
               setTrailCoordinates(savedTrace.coordinates);
               setReplayBaseLocation(savedTrace.coordinates[0]);
             }
+            savedTrailCoordinatesRef.current = savedTrace.coordinates || [];
             if (savedTrace.waypoints) {
               setSavedMedia(savedTrace.waypoints);
             }
@@ -154,6 +156,7 @@ export default function TraceWorkspacePage() {
               setTrailCoordinates(fetchedTrace.coordinates);
               setReplayBaseLocation(fetchedTrace.coordinates[0]);
             }
+            savedTrailCoordinatesRef.current = fetchedTrace.coordinates || [];
             if (fetchedTrace.waypoints) {
               setSavedMedia(fetchedTrace.waypoints);
             }
@@ -192,15 +195,13 @@ export default function TraceWorkspacePage() {
   // Engine Connection #2: Hardware device telemetry location tracking engine
   // CRITICAL FIX: The GPS tracker is now allowed to run when idle to query the user's initial anchor dot frame
   const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, retryGps } = useGPSTracker(
-    !isReplayMode,
+    isRecording,
     (coords: [number, number], heading: number | null) => {
-      if (!isReplayMode) {
-        // eslint-disable-next-line react-hooks/immutability
-        handleLocationStream(coords, heading);
-      }
+      // eslint-disable-next-line react-hooks/immutability
+      handleLocationStream(coords, heading);
     },
     (updatedPath: [number, number][]) => {
-      if (!isReplayMode && isRecording) {
+      if (isRecording) {
         setTrailCoordinates(updatedPath);
         // eslint-disable-next-line react-hooks/immutability
         updateVectorPath(updatedPath);
@@ -214,6 +215,8 @@ export default function TraceWorkspacePage() {
     toggleViewPerspective,
     handleLocationStream,
     updateVectorPath,
+    updateGhostPath,
+    setTiltedView,
     centerOnCoords
   } = useMapEngine(
     mapRef,
@@ -222,6 +225,25 @@ export default function TraceWorkspacePage() {
     trailCoordinates,
     savedMedia
   );
+
+  // Replay guidance — drives the discovery experience
+  const savedTrailCoordinatesRef = useRef<[number, number][]>([]);
+  const {
+    isNearStart,
+    hasStarted,
+    isOffRoute,
+    offRouteDistance,
+    distanceToStart,
+    trailProgress,
+    activeWaypoint: guidanceWaypoint,
+    startGuidance,
+    dismissWaypoint,
+  } = useReplayGuidance({
+    trailCoordinates: savedTrailCoordinatesRef.current,
+    waypoints: savedMedia,
+    userLocation,
+    isReplayMode,
+  });
 
 
 
@@ -351,7 +373,59 @@ export default function TraceWorkspacePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newTrace),
-      });
+  });
+
+  // Replay guidance — drives the discovery experience
+  const savedTrailCoordinatesRef = useRef<[number, number][]>([]);
+  const {
+    isNearStart,
+    hasStarted,
+    isOffRoute,
+    offRouteDistance,
+    distanceToStart,
+    trailProgress,
+    activeWaypoint: guidanceWaypoint,
+    startGuidance,
+    dismissWaypoint,
+  } = useReplayGuidance({
+    trailCoordinates: savedTrailCoordinatesRef.current,
+    waypoints: savedMedia,
+    userLocation,
+    isReplayMode,
+  });
+
+  // Show full trail as ghost in replay mode (dimmed), hide during recording
+  useEffect(() => {
+    if (isReplayMode && savedTrailCoordinatesRef.current.length > 0) {
+      updateGhostPath(savedTrailCoordinatesRef.current);
+      setTiltedView(true);
+    } else {
+      updateGhostPath([]);
+    }
+  }, [isReplayMode]);
+
+  // Update active trail in replay mode — only show revealed portion
+  useEffect(() => {
+    if (!isReplayMode || !hasStarted || savedTrailCoordinatesRef.current.length === 0) {
+      if (isReplayMode && savedTrailCoordinatesRef.current.length > 0) {
+        updateVectorPath(savedTrailCoordinatesRef.current);
+      }
+      return;
+    }
+    const fullTrail = savedTrailCoordinatesRef.current;
+    const revealIndex = Math.floor(trailProgress * fullTrail.length);
+    const revealed = fullTrail.slice(0, Math.min(revealIndex + 5, fullTrail.length));
+    updateVectorPath(revealed);
+  }, [isReplayMode, hasStarted, trailProgress]);
+
+  // Update ghost trail in replay to hide already-revealed portion
+  useEffect(() => {
+    if (!isReplayMode || !hasStarted || savedTrailCoordinatesRef.current.length === 0) return;
+    const fullTrail = savedTrailCoordinatesRef.current;
+    const revealIndex = Math.floor(trailProgress * fullTrail.length);
+    const remaining = fullTrail.slice(revealIndex);
+    updateGhostPath(remaining);
+  }, [isReplayMode, hasStarted, trailProgress]);
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -387,15 +461,6 @@ export default function TraceWorkspacePage() {
 
   const handleCloseSaveReview = () => {
     setShowSaveReview(false);
-  };
-
-  const handleFollowRoute = () => {
-    setIsReplayMode(false);
-    setSavedMedia([]);
-    setShowSaveReview(false);
-    setIsRecording(true);
-    setIsAddMenuOpen(false);
-    toast.info("Following Route", "Recording a new path along this trace guide.");
   };
 
   // --- LOADER CONFIGURATION DIALS ---
@@ -442,7 +507,7 @@ export default function TraceWorkspacePage() {
         {/* SIDE DRAWER MARKER NODE SHEETS */}
         <WaypointSheet activeWaypoint={activeWaypoint} onClose={() => setActiveWaypoint(null)} />
 
-        {/* REPLAY PANEL: shown when viewing a saved trace */}
+        {/* REPLAY PANEL: guided discovery for saved traces */}
         {isReplayMode && (
           <ReplayOverlay
             title={traceTitleInput}
@@ -450,12 +515,19 @@ export default function TraceWorkspacePage() {
             distance={traceDistance}
             waypoints={savedMedia}
             onBack={() => router.push("/dashboard")}
-            onFollow={handleFollowRoute}
-            onWaypointSelect={(wp) => {
-              centerOnCoords(wp.coordinates);
-              setActiveWaypoint(wp);
+            isGuidedMode={true}
+            hasStarted={hasStarted}
+            isNearStart={isNearStart}
+            isOffRoute={isOffRoute}
+            offRouteDistance={offRouteDistance}
+            distanceToStart={distanceToStart}
+            trailProgress={trailProgress}
+            activeWaypoint={guidanceWaypoint}
+            onStartGuidance={() => {
+              startGuidance();
+              setTiltedView(true);
             }}
-            activeWaypointId={activeWaypoint?.id}
+            onDismissWaypoint={dismissWaypoint}
           />
         )}
 

@@ -61,6 +61,29 @@ export function useMapEngine(
         layout: { "line-join": "round", "line-cap": "round" },
         paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
       });
+
+      // Ghost trail layer for replay — full route shown dimly
+      map.addSource("ghost-trail-source", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: [] },
+        },
+      });
+
+      map.addLayer({
+        id: "ghost-trail-layer",
+        type: "line",
+        source: "ghost-trail-source",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": "#000000",
+          "line-width": 3,
+          "line-opacity": 0.08,
+          "line-dasharray": [2, 3],
+        },
+      });
     });
 
     const el = document.createElement("div");
@@ -198,11 +221,36 @@ export function useMapEngine(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedMedia]);
 
+  const updateGhostPath = (coordinates: [number, number][]) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const source = map.getSource("ghost-trail-source") as mapboxgl.GeoJSONSource;
+    if (source) {
+      source.setData({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "LineString", coordinates },
+      });
+    }
+  };
+
+  const setTiltedView = (tilted: boolean) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    if (tilted) {
+      map.easeTo({ pitch: 65, bearing: 0, duration: 1200 });
+      setViewMode("tilted");
+    } else {
+      map.easeTo({ pitch: 0, bearing: 0, duration: 1200 });
+      setViewMode("flat");
+    }
+  };
+
   const centerOnCoords = (coords: [number, number]) => {
     const map = mapInstanceRef.current;
     if (!map) return;
     map.easeTo({ center: coords, zoom: 17, duration: 700 });
   };
 
-  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, injectDOMMarker, centerOnCoords };
+  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, updateGhostPath, setTiltedView, injectDOMMarker, centerOnCoords };
 }
