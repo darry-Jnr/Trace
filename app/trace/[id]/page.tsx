@@ -217,24 +217,25 @@ export default function TraceWorkspacePage() {
     updateVectorPath,
     updateGhostPath,
     setTiltedView,
-    centerOnCoords
+    centerOnCoords,
+    setStartPoint,
+    enableFollowMode,
+    disableFollowMode,
   } = useMapEngine(
     mapRef,
     isReplayMode ? replayBaseLocation : baseLocation,
     setActiveWaypoint,
     trailCoordinates,
-    savedMedia
+    isReplayMode ? [] : savedMedia
   );
 
   // Replay guidance — drives the discovery experience
   const savedTrailCoordinatesRef = useRef<[number, number][]>([]);
   const {
-    isNearStart,
+    isSynced,
     hasStarted,
-    isOffRoute,
-    offRouteDistance,
     distanceToStart,
-    trailProgress,
+    unlockedWaypoints,
     activeWaypoint: guidanceWaypoint,
     startGuidance,
     dismissWaypoint,
@@ -245,7 +246,32 @@ export default function TraceWorkspacePage() {
     isReplayMode,
   });
 
+  // Set start point marker when replay loads (blue dot)
+  useEffect(() => {
+    if (isReplayMode && savedTrailCoordinatesRef.current.length > 0) {
+      setStartPoint(savedTrailCoordinatesRef.current[0], "blue");
+    } else {
+      setStartPoint(null);
+    }
+  }, [isReplayMode, setStartPoint]);
 
+  // Turn start point green when user arrives (sync)
+  useEffect(() => {
+    if (isReplayMode && isSynced && savedTrailCoordinatesRef.current.length > 0) {
+      setStartPoint(savedTrailCoordinatesRef.current[0], "green");
+    } else if (isReplayMode && !isSynced && savedTrailCoordinatesRef.current.length > 0) {
+      setStartPoint(savedTrailCoordinatesRef.current[0], "blue");
+    }
+  }, [isReplayMode, isSynced, setStartPoint]);
+
+  // Enable follow mode when guidance starts
+  useEffect(() => {
+    if (hasStarted) {
+      enableFollowMode();
+    } else {
+      disableFollowMode();
+    }
+  }, [hasStarted, enableFollowMode, disableFollowMode]);
 
   // Fallback fallback pointer coordinate interceptor
   const getCurrentCapturePoint = () => {
@@ -373,59 +399,7 @@ export default function TraceWorkspacePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newTrace),
-  });
-
-  // Replay guidance — drives the discovery experience
-  const savedTrailCoordinatesRef = useRef<[number, number][]>([]);
-  const {
-    isNearStart,
-    hasStarted,
-    isOffRoute,
-    offRouteDistance,
-    distanceToStart,
-    trailProgress,
-    activeWaypoint: guidanceWaypoint,
-    startGuidance,
-    dismissWaypoint,
-  } = useReplayGuidance({
-    trailCoordinates: savedTrailCoordinatesRef.current,
-    waypoints: savedMedia,
-    userLocation,
-    isReplayMode,
-  });
-
-  // Show full trail as ghost in replay mode (dimmed), hide during recording
-  useEffect(() => {
-    if (isReplayMode && savedTrailCoordinatesRef.current.length > 0) {
-      updateGhostPath(savedTrailCoordinatesRef.current);
-      setTiltedView(true);
-    } else {
-      updateGhostPath([]);
-    }
-  }, [isReplayMode]);
-
-  // Update active trail in replay mode — only show revealed portion
-  useEffect(() => {
-    if (!isReplayMode || !hasStarted || savedTrailCoordinatesRef.current.length === 0) {
-      if (isReplayMode && savedTrailCoordinatesRef.current.length > 0) {
-        updateVectorPath(savedTrailCoordinatesRef.current);
-      }
-      return;
-    }
-    const fullTrail = savedTrailCoordinatesRef.current;
-    const revealIndex = Math.floor(trailProgress * fullTrail.length);
-    const revealed = fullTrail.slice(0, Math.min(revealIndex + 5, fullTrail.length));
-    updateVectorPath(revealed);
-  }, [isReplayMode, hasStarted, trailProgress]);
-
-  // Update ghost trail in replay to hide already-revealed portion
-  useEffect(() => {
-    if (!isReplayMode || !hasStarted || savedTrailCoordinatesRef.current.length === 0) return;
-    const fullTrail = savedTrailCoordinatesRef.current;
-    const revealIndex = Math.floor(trailProgress * fullTrail.length);
-    const remaining = fullTrail.slice(revealIndex);
-    updateGhostPath(remaining);
-  }, [isReplayMode, hasStarted, trailProgress]);
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -513,15 +487,11 @@ export default function TraceWorkspacePage() {
             title={traceTitleInput}
             date={traceDate}
             distance={traceDistance}
-            waypoints={savedMedia}
             onBack={() => router.push("/dashboard")}
-            isGuidedMode={true}
+            isSynced={isSynced}
             hasStarted={hasStarted}
-            isNearStart={isNearStart}
-            isOffRoute={isOffRoute}
-            offRouteDistance={offRouteDistance}
             distanceToStart={distanceToStart}
-            trailProgress={trailProgress}
+            unlockedWaypoints={unlockedWaypoints}
             activeWaypoint={guidanceWaypoint}
             onStartGuidance={() => {
               startGuidance();

@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WaypointMedia } from "@/types";
 
-const START_THRESHOLD = 50;
-const OFF_ROUTE_THRESHOLD = 30;
+const SYNC_THRESHOLD = 15;
 const WAYPOINT_THRESHOLD = 25;
 
 function getDistanceMeters(a: [number, number], b: [number, number]) {
@@ -18,22 +17,6 @@ function getDistanceMeters(a: [number, number], b: [number, number]) {
   const aCalc =
     sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
   return R * 2 * Math.atan2(Math.sqrt(aCalc), Math.sqrt(1 - aCalc));
-}
-
-function findNearestOnTrail(
-  user: [number, number],
-  trail: [number, number][]
-): { index: number; distance: number } {
-  let minDist = Infinity;
-  let minIndex = 0;
-  for (let i = 0; i < trail.length; i++) {
-    const d = getDistanceMeters(user, trail[i]);
-    if (d < minDist) {
-      minDist = d;
-      minIndex = i;
-    }
-  }
-  return { index: minIndex, distance: minDist };
 }
 
 interface UseReplayGuidanceOptions {
@@ -50,46 +33,46 @@ export function useReplayGuidance({
   isReplayMode,
 }: UseReplayGuidanceOptions) {
   const [hasStarted, setHasStarted] = useState(false);
-  const [isOffRoute, setIsOffRoute] = useState(false);
-  const [offRouteDistance, setOffRouteDistance] = useState(0);
-  const [trailProgress, setTrailProgress] = useState(0);
+  const [isSynced, setIsSynced] = useState(false);
+  const [distanceToStart, setDistanceToStart] = useState<number | null>(null);
+  const [unlockedWaypoints, setUnlockedWaypoints] = useState<WaypointMedia[]>([]);
   const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
   const triggeredRef = useRef(new Set<string>());
-
-  const isNearStart =
-    isReplayMode &&
-    !hasStarted &&
-    userLocation !== null &&
-    trailCoordinates.length > 0 &&
-    getDistanceMeters(userLocation, trailCoordinates[0]) < START_THRESHOLD;
-
-  const distanceToStart =
-    isReplayMode && !hasStarted && userLocation !== null && trailCoordinates.length > 0
-      ? getDistanceMeters(userLocation, trailCoordinates[0])
-      : null;
 
   useEffect(() => {
     if (!isReplayMode) {
       setHasStarted(false);
-      setIsOffRoute(false);
+      setIsSynced(false);
+      setUnlockedWaypoints([]);
       setActiveWaypoint(null);
       triggeredRef.current.clear();
     }
   }, [isReplayMode]);
 
   useEffect(() => {
-    if (!isReplayMode || !hasStarted || !userLocation || trailCoordinates.length === 0) return;
+    if (!isReplayMode || !userLocation || trailCoordinates.length === 0) {
+      setDistanceToStart(null);
+      setIsSynced(false);
+      return;
+    }
 
-    const nearest = findNearestOnTrail(userLocation, trailCoordinates);
-    setIsOffRoute(nearest.distance > OFF_ROUTE_THRESHOLD);
-    setOffRouteDistance(Math.round(nearest.distance));
-    setTrailProgress(nearest.index / trailCoordinates.length);
+    const dist = getDistanceMeters(userLocation, trailCoordinates[0]);
+    setDistanceToStart(dist);
+
+    if (!hasStarted) {
+      setIsSynced(dist < SYNC_THRESHOLD);
+    }
+  }, [isReplayMode, userLocation, trailCoordinates, hasStarted]);
+
+  useEffect(() => {
+    if (!isReplayMode || !hasStarted || !userLocation || trailCoordinates.length === 0) return;
 
     for (const wp of waypoints) {
       if (triggeredRef.current.has(wp.id)) continue;
       const dist = getDistanceMeters(userLocation, wp.coordinates);
       if (dist < WAYPOINT_THRESHOLD) {
         triggeredRef.current.add(wp.id);
+        setUnlockedWaypoints((prev) => [...prev, wp]);
         setActiveWaypoint(wp);
         break;
       }
@@ -98,8 +81,7 @@ export function useReplayGuidance({
 
   const startGuidance = useCallback(() => {
     setHasStarted(true);
-    triggeredRef.current.clear();
-    setActiveWaypoint(null);
+    setIsSynced(false);
   }, []);
 
   const dismissWaypoint = useCallback(() => {
@@ -107,12 +89,10 @@ export function useReplayGuidance({
   }, []);
 
   return {
-    isNearStart,
+    isSynced,
     hasStarted,
-    isOffRoute,
-    offRouteDistance,
     distanceToStart,
-    trailProgress,
+    unlockedWaypoints,
     activeWaypoint,
     startGuidance,
     dismissWaypoint,
