@@ -1,9 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { Camera, SendHorizontal } from "lucide-react";
 import VoiceRecorder from "./VoiceRecorder";
-import CameraViewport from "./CameraViewport";
+
+const CameraViewport = dynamic(
+  () => import("./CameraViewport"),
+  { ssr: false }
+);
 
 interface ActionDockProps {
   onSendText?: (text: string) => void;

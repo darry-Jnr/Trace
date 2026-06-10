@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import PendoPageTracker from "@/components/PendoPageTracker";
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+});
 
 export const metadata: Metadata = {
   title: "Trace — Show people exactly where to go.",
@@ -56,8 +62,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className="antialiased">
+      <body className={`antialiased ${plusJakarta.variable}`}>
         <ToastProvider>
           <PendoPageTracker />
           {children}

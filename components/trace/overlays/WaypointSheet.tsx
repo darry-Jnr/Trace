@@ -94,7 +94,7 @@ export default function WaypointSheet({ activeWaypoint, onClose }: WaypointSheet
                       src={audioSrc}
                       onEnded={() => setIsPlaying(false)}
                       onError={() => setAudioError(true)}
-                      preload="auto"
+                      preload="metadata"
                     />
                     <div className="flex items-center gap-[3px] h-6 flex-1 opacity-25">
                       {[2, 4, 3, 6, 2, 5, 4, 7, 3, 5, 2, 6, 4, 3, 5, 2, 4, 3, 5, 2, 4].map((val, i) => (

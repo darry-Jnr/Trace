@@ -39,9 +39,26 @@ export function useReplayGuidance(
   const syncedRef = useRef(false);
   const completedRef = useRef(false);
   const triggeredWpRef = useRef<Set<string>>(new Set());
+  const lastLocationRef = useRef<[number, number] | null>(null);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     if (!isReplayMode || !userLocation || trailCoordinates.length < 2) return;
+
+    // Throttle: skip if already processing (max once per ~500ms tick)
+    if (processingRef.current) return;
+    processingRef.current = true;
+    const release = () => { processingRef.current = false; };
+
+    // Skip if user hasn't moved significantly (>5m) since last check
+    if (lastLocationRef.current) {
+      const moved = getDistance(lastLocationRef.current, userLocation);
+      if (moved < 5) {
+        release();
+        return;
+      }
+    }
+    lastLocationRef.current = userLocation;
 
     const start = trailCoordinates[0];
     const dist = getDistance(userLocation, start);
@@ -66,18 +83,13 @@ export function useReplayGuidance(
 
       let closestIdx = 0;
       let minDist = Infinity;
-      trailCoordinates.forEach((coord, i) => {
-        const d = getDistance(userLocation, coord);
+      for (let i = 0; i < trailCoordinates.length; i++) {
+        const d = getDistance(userLocation, trailCoordinates[i]);
         if (d < minDist) {
           minDist = d;
           closestIdx = i;
         }
-      });
-
-      const progressPct = Math.round((closestIdx / (trailCoordinates.length - 1)) * 100);
-      setTrailProgress(progressPct);
-
-      setProgressCoords(trailCoordinates.slice(0, closestIdx + 1));
+      }
 
       const end = trailCoordinates[trailCoordinates.length - 1];
       const endDist = getDistance(userLocation, end);
@@ -85,7 +97,15 @@ export function useReplayGuidance(
         completedRef.current = true;
         setGuidanceState("complete");
       }
+
+      // Only update progress state if significantly changed (avoid setState on every tick)
+      const progressPct = Math.round((closestIdx / (trailCoordinates.length - 1)) * 100);
+      setTrailProgress((prev) => Math.abs(prev - progressPct) > 2 ? progressPct : prev);
+
+      setProgressCoords(trailCoordinates.slice(0, closestIdx + 1));
     }
+
+    release();
   }, [userLocation, isReplayMode, trailCoordinates, waypoints, guidanceState]);
 
   const startGuidance = useCallback(() => {

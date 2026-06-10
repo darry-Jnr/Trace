@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useToast } from "@/components/ui/Toast";
-import SaveReviewModal from "@/components/trace/overlays/SaveReviewModal";
 
 import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
 import { useMapEngine } from "@/hooks/trace/useMapEngine";
@@ -15,10 +15,18 @@ import ControlDeck from "@/components/trace/ControlDeck";
 import WaypointSheet from "@/components/trace/overlays/WaypointSheet";
 import InitialLoader from "@/components/trace/overlays/InitialLoader";
 import ReplayOverlay from "@/components/trace/overlays/ReplayOverlay";
-import CommentSection from "@/components/trace/overlays/CommentSection";
 import NameModal from "@/components/trace/NameModal";
+import RecordingTimer from "@/components/trace/RecordingTimer";
+import LocationStatus from "@/components/trace/LocationStatus";
 
-import "mapbox-gl/dist/mapbox-gl.css";
+const SaveReviewModal = dynamic(
+  () => import("@/components/trace/overlays/SaveReviewModal"),
+  { ssr: false }
+);
+const CommentSection = dynamic(
+  () => import("@/components/trace/overlays/CommentSection"),
+  { ssr: false }
+);
 
 export default function TraceWorkspacePage() {
   const router = useRouter();
@@ -26,6 +34,13 @@ export default function TraceWorkspacePage() {
   const id = params?.id as string;
   const toast = useToast();
   const mapRef = useRef<HTMLDivElement>(null);
+
+  // App bootstrap — initial loader hides after 2s max regardless of GPS
+  const [appReady, setAppReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setAppReady(true), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Core UI Action Layout States
   const [isRecording, setIsRecording] = useState(false);
@@ -44,7 +59,6 @@ export default function TraceWorkspacePage() {
   const [recordingStartedAt, setRecordingStartedAt] = useState<string>("");
   const [showStartHint, setShowStartHint] = useState(false);
   const [gpsTimedOut, setGpsTimedOut] = useState(false);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -289,7 +303,8 @@ export default function TraceWorkspacePage() {
     toggleViewPerspective,
     handleLocationStream,
     updateVectorPath,
-    centerOnCoords
+    centerOnCoords,
+    mapError
   } = useMapEngine(
     mapRef,
     isReplayMode ? replayBaseLocation : baseLocation,
@@ -483,7 +498,7 @@ export default function TraceWorkspacePage() {
 
   const showInitialLoader = isReplayMode
     ? !replayBaseLocation
-    : (gpsLoading || (!hasGpsFix && !gpsTimedOut));
+    : !appReady;
   const loadingMessageStr = isReplayMode
     ? "Loading saved trace..."
     : (gpsTimedOut ? "Could not find location" : loadingMessage);
@@ -507,32 +522,29 @@ export default function TraceWorkspacePage() {
     if (isRecording) setShowStartHint(false);
   }, [isRecording]);
 
-  // Elapsed time counter for recording pill
-  useEffect(() => {
-    if (!isRecording) {
-      setElapsedMs(0);
-      return;
-    }
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      setElapsedMs(Date.now() - startTime);
-    }, 200);
-    return () => clearInterval(interval);
-  }, [isRecording]);
-
-  const formatElapsed = (ms: number) => {
-    const totalSec = Math.floor(ms / 1000);
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec % 60;
-    return `${min}:${sec.toString().padStart(2, "0")}`;
-  };
-
   return (
     <div className="relative flex w-screen h-screen overflow-hidden bg-[#f5f5f7] font-sans selection:bg-black selection:text-white">
       <div className="relative flex-1 h-full min-w-0 transition-all duration-300 z-0 [&_.mapboxgl-ctrl-logo]:hidden [&_.mapboxgl-ctrl-attrib]:hidden">
 
         {/* BACKDROP INTERACTIVE CANVAS ENGINE */}
         <MapCanvas mapRef={mapRef} onClearActive={() => setActiveWaypoint(null)} />
+
+        {/* Map load error state */}
+        {mapError && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f5f5f7]/90 backdrop-blur-sm">
+            <div className="max-w-xs text-center">
+              <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-black/80 mb-1">Map unavailable</p>
+              <p className="text-xs font-medium text-black/40 leading-relaxed">{mapError}</p>
+            </div>
+          </div>
+        )}
 
         {/* SIDE DRAWER MARKER NODE SHEETS — only in recording mode */}
         {!isReplayMode && (
@@ -642,46 +654,8 @@ export default function TraceWorkspacePage() {
               onPhotoCaptured={handleSavePhotoMarker}
             />
 
-            {/* Location status banner — visible until GPS locks */}
-            {!hasGpsFix && !gpsTimedOut && (
-              <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 animate-fade-in">
-                <div className="px-4 py-2 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex items-center gap-2.5">
-                  <span className="relative flex w-2 h-2">
-                    <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-[#0052FF] opacity-75" />
-                    <span className="relative inline-flex w-2 h-2 rounded-full bg-[#0052FF]" />
-                  </span>
-                  <span className="text-[12px] font-medium text-black/60 tracking-tight">Finding your location...</span>
-                </div>
-              </div>
-            )}
-            {gpsTimedOut && !hasGpsFix && (
-              <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 animate-fade-in">
-                <div className="px-4 py-2 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex items-center gap-2.5">
-                  <span className="text-[12px] font-medium text-black/40 tracking-tight">Location unavailable</span>
-                  <button
-                    onClick={retryGps}
-                    className="text-[12px] font-semibold text-[#0052FF] hover:text-black transition-colors"
-                  >
-                    Retry
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Recording pill — pulsing red dot + elapsed time */}
-            {isRecording && (
-              <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 animate-fade-in">
-                <div className="px-4 py-2 rounded-full bg-black/90 backdrop-blur-2xl border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.2)] flex items-center gap-2.5">
-                  <span className="relative flex w-2 h-2">
-                    <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-red-500 opacity-75" />
-                    <span className="relative inline-flex w-2 h-2 rounded-full bg-red-500" />
-                  </span>
-                  <span className="text-[12px] font-semibold text-white/90 tracking-tight tabular-nums">
-                    {formatElapsed(elapsedMs)}
-                  </span>
-                </div>
-              </div>
-            )}
+            <LocationStatus hasGpsFix={hasGpsFix} gpsTimedOut={gpsTimedOut} onRetry={retryGps} />
+            <RecordingTimer isRecording={isRecording} />
 
             {/* Onboarding hint — points at the Start button */}
             {showStartHint && !isRecording && (

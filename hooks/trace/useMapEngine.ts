@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import mapboxgl from "mapbox-gl";
+import type mapboxgl from "mapbox-gl";
 import { ViewMode, WaypointMedia, CACHE_KEY } from "@/types";
 import { chaikinSmooth } from "./chaikinSmooth";
 
@@ -23,70 +23,91 @@ export function useMapEngine(
   const startMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const injectedMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
+  const [mapError, setMapError] = useState<string | null>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mapboxglRef = useRef<any>(null);
 
   // Mount Instance Mapbox Canvas
   useEffect(() => {
     if (!baseLocation || !mapRef.current || mapInstanceRef.current) return;
 
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
+    let cancelled = false;
 
-    let hasCache = false;
-    try {
-      if (localStorage.getItem(CACHE_KEY)) hasCache = true;
-    } catch {}
+    (async () => {
+      try {
+        const mbgl = await import("mapbox-gl");
+        await import("mapbox-gl/dist/mapbox-gl.css");
 
-    const map = new mapboxgl.Map({
-      container: mapRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: baseLocation,
-      zoom: hasCache ? 17 : 14,
-      pitch: 0,
-      bearing: 0,
-      antialias: true,
-      attributionControl: false,
-    });
+        if (cancelled) return;
 
-    map.on("style.load", () => {
-      map.setFog({
-        color: "rgb(230, 240, 255)",
-        "high-color": "rgb(255, 255, 255)",
-        "horizon-blend": 0.03,
-      });
+        mapboxglRef.current = mbgl.default;
+        const mapboxgl = mapboxglRef.current;
+        mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
-      map.addSource("recording-trail-source", {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "LineString", coordinates: [] },
-        },
-      });
+        let hasCache = false;
+        try {
+          if (localStorage.getItem(CACHE_KEY)) hasCache = true;
+        } catch {}
 
-      map.addLayer({
-        id: "recording-trail-layer",
-        type: "line",
-        source: "recording-trail-source",
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
-      });
-    });
+        const map = new mapboxgl.Map({
+          container: mapRef.current!,
+          style: "mapbox://styles/mapbox/streets-v12",
+          center: baseLocation,
+          zoom: hasCache ? 17 : 14,
+          pitch: 0,
+          bearing: 0,
+          antialias: true,
+          attributionControl: false,
+        });
 
-    // User marker (default blue)
-    const el = document.createElement("div");
-    el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-4 border-white shadow-[0_2px_10px_rgba(0,82,255,0.4)] flex items-center justify-center relative";
-    el.innerHTML = `<span class="absolute inset-0 rounded-full bg-[#0052FF]/30 animate-ping scale-150 pointer-events-none" style="animation-duration: 2s;" />`;
+        map.on("style.load", () => {
+          map.setFog({
+            color: "rgb(230, 240, 255)",
+            "high-color": "rgb(255, 255, 255)",
+            "horizon-blend": 0.03,
+          });
 
-    const userMarker = new mapboxgl.Marker({ element: el }).setLngLat(baseLocation).addTo(map);
+          map.addSource("recording-trail-source", {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "LineString", coordinates: [] },
+            },
+          });
 
-    mapInstanceRef.current = map;
-    userMarkerRef.current = userMarker;
+          map.addLayer({
+            id: "recording-trail-layer",
+            type: "line",
+            source: "recording-trail-source",
+            layout: { "line-join": "round", "line-cap": "round" },
+            paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
+          });
+        });
+
+        // User marker (default blue)
+        const el = document.createElement("div");
+        el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-4 border-white shadow-[0_2px_10px_rgba(0,82,255,0.4)] flex items-center justify-center relative";
+        el.innerHTML = `<span class="absolute inset-0 rounded-full bg-[#0052FF]/30 animate-ping scale-150 pointer-events-none" style="animation-duration: 2s;" />`;
+
+        const userMarker = new mapboxgl.Marker({ element: el }).setLngLat(baseLocation).addTo(map);
+
+        mapInstanceRef.current = map;
+        userMarkerRef.current = userMarker;
+      } catch (e) {
+        if (!cancelled) {
+          console.error("Failed to load Mapbox:", e);
+          setMapError("Could not load map. Please check your internet connection and try again.");
+        }
+      }
+    })();
 
     const markerCache = injectedMarkersRef.current;
     return () => {
+      cancelled = true;
       if (userMarkerRef.current) userMarkerRef.current.remove();
       removeReplayVisuals();
-      map.remove();
+      if (mapInstanceRef.current) mapInstanceRef.current.remove();
       mapInstanceRef.current = null;
       markerCache.forEach((marker) => marker.remove());
       markerCache.clear();
@@ -139,7 +160,7 @@ export function useMapEngine(
       `;
       const coords = trailCoordsRef.current;
       const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
-      const startMarker = new mapboxgl.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
+      const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
       startMarkerRef.current = startMarker;
     };
 
@@ -350,7 +371,7 @@ export function useMapEngine(
       map.easeTo({ center: waypoint.coordinates, duration: 600 });
     });
 
-    const marker = new mapboxgl.Marker({ element: el }).setLngLat(waypoint.coordinates).addTo(map);
+    const marker = new mapboxglRef.current.Marker({ element: el }).setLngLat(waypoint.coordinates).addTo(map);
     return marker;
   };
 
@@ -413,5 +434,5 @@ export function useMapEngine(
     map.easeTo({ center: coords, zoom: 17, duration: 700 });
   };
 
-  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, injectDOMMarker, centerOnCoords };
+  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, injectDOMMarker, centerOnCoords, mapError };
 }
