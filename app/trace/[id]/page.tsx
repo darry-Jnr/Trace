@@ -7,6 +7,7 @@ import SaveReviewModal from "@/components/trace/overlays/SaveReviewModal";
 
 import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
 import { useMapEngine } from "@/hooks/trace/useMapEngine";
+import { useReplayGuidance } from "@/hooks/trace/useReplayGuidance";
 import { WaypointMedia } from "@/types";
 
 import MapCanvas from "@/components/trace/MapCanvas";
@@ -192,14 +193,12 @@ export default function TraceWorkspacePage() {
   }, [id]);
 
   // Engine Connection #2: Hardware device telemetry location tracking engine
-  // CRITICAL FIX: The GPS tracker is now allowed to run when idle to query the user's initial anchor dot frame
+  // Always runs — recording mode tracks path, replay mode tracks follower
   const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, retryGps } = useGPSTracker(
-    !isReplayMode,
+    true,
     (coords: [number, number], heading: number | null) => {
-      if (!isReplayMode) {
-        // eslint-disable-next-line react-hooks/immutability
-        handleLocationStream(coords, heading);
-      }
+      // eslint-disable-next-line react-hooks/immutability
+      handleLocationStream(coords, heading);
     },
     (updatedPath: [number, number][]) => {
       if (!isReplayMode && isRecording) {
@@ -232,6 +231,31 @@ export default function TraceWorkspacePage() {
     setRetryTrigger((t) => t + 1);
   }, [retryGps]);
 
+  // Engine Connection #3: Replay guidance system
+  const {
+    guidanceState,
+    distanceToStart,
+    trailProgress,
+    progressCoords,
+    unlockedWaypointIds,
+    activeWaypoint: unlockedWaypoint,
+    startGuidance,
+    dismissWaypoint,
+    reset: resetGuidance,
+  } = useReplayGuidance(
+    userLocation,
+    trailCoordinates,
+    savedMedia,
+    isReplayMode
+  );
+
+  // In replay mode, use unlocked waypoint from guidance OR manually tapped one
+  const replayActiveWaypoint = unlockedWaypoint || activeWaypoint;
+  const handleDismissWaypoint = useCallback(() => {
+    dismissWaypoint();
+    setActiveWaypoint(null);
+  }, [dismissWaypoint]);
+
   // Engine Connection #1: Mapbox canvas lifecycle engine
   const {
     viewMode,
@@ -245,7 +269,12 @@ export default function TraceWorkspacePage() {
     setActiveWaypoint,
     trailCoordinates,
     savedMedia,
-    isRecording
+    isRecording,
+    isReplayMode,
+    guidanceState === "synced",
+    guidanceState === "following",
+    unlockedWaypointIds,
+    progressCoords
   );
 
 
@@ -414,15 +443,6 @@ export default function TraceWorkspacePage() {
     setShowSaveReview(false);
   };
 
-  const handleFollowRoute = () => {
-    setIsReplayMode(false);
-    setSavedMedia([]);
-    setShowSaveReview(false);
-    setIsRecording(true);
-    setIsAddMenuOpen(false);
-    toast.info("Following Route", "Recording a new path along this trace guide.");
-  };
-
   // --- LOADER CONFIGURATION DIALS ---
   const loadingMessage = {
     booting: "Preparing workspace",
@@ -484,23 +504,21 @@ export default function TraceWorkspacePage() {
         {/* BACKDROP INTERACTIVE CANVAS ENGINE */}
         <MapCanvas mapRef={mapRef} onClearActive={() => setActiveWaypoint(null)} />
 
-        {/* SIDE DRAWER MARKER NODE SHEETS */}
-        <WaypointSheet activeWaypoint={activeWaypoint} onClose={() => setActiveWaypoint(null)} />
+        {/* SIDE DRAWER MARKER NODE SHEETS — only in recording mode */}
+        {!isReplayMode && (
+          <WaypointSheet activeWaypoint={activeWaypoint} onClose={() => setActiveWaypoint(null)} />
+        )}
 
-        {/* REPLAY PANEL: shown when viewing a saved trace */}
+        {/* REPLAY OVERLAYS: distance badge, sync, guidance, completion */}
         {isReplayMode && (
           <ReplayOverlay
-            title={traceTitleInput}
-            date={traceDate}
-            distance={traceDistance}
-            waypoints={savedMedia}
+            guidanceState={guidanceState}
+            distanceToStart={distanceToStart}
+            trailProgress={trailProgress}
+            activeWaypoint={replayActiveWaypoint}
+            onStartGuidance={startGuidance}
+            onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}
-            onFollow={handleFollowRoute}
-            onWaypointSelect={(wp) => {
-              centerOnCoords(wp.coordinates);
-              setActiveWaypoint(wp);
-            }}
-            activeWaypointId={activeWaypoint?.id}
           />
         )}
 
