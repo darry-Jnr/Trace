@@ -54,14 +54,19 @@ export default function ControlDeck({
       <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-3">
 
         {/* Start / Stop */}
-        <button
-          onClick={onToggleRecord}
-          className={`group relative w-[58px] h-[58px] rounded-[22px] backdrop-blur-2xl border shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200 overflow-hidden ${
-            isRecording
-              ? "bg-black border-black text-white"
-              : "bg-white/80 border-black/[0.05] text-black"
-          }`}
-        >
+        <div className="relative">
+          {/* Recording glow ring */}
+          {isRecording && (
+            <div className="absolute inset-[-6px] rounded-[28px] bg-red-500/10 animate-ping pointer-events-none" style={{ animationDuration: "1.5s" }} />
+          )}
+          <button
+            onClick={onToggleRecord}
+            className={`group relative w-[58px] h-[58px] rounded-[22px] backdrop-blur-2xl border flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200 overflow-hidden ${
+              isRecording
+                ? "bg-black border-black text-white shadow-[0_0_24px_rgba(255,59,48,0.35)]"
+                : "bg-white/80 border-black/[0.05] text-black shadow-[0_10px_30px_rgba(0,0,0,0.06)]"
+            }`}
+          >
           {/* Reflection */}
           <div
             className={`absolute inset-0 pointer-events-none ${
@@ -85,6 +90,7 @@ export default function ControlDeck({
             {isRecording ? "Stop" : "Start"}
           </span>
         </button>
+        </div>
 
         {/* Add Button */}
         {isRecording && (

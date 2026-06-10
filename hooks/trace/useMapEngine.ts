@@ -9,7 +9,8 @@ export function useMapEngine(
   baseLocation: [number, number] | null,
   onWaypointSelect: (waypoint: WaypointMedia) => void,
   trailCoordinates: [number, number][] = [],
-  savedMedia: WaypointMedia[] = []
+  savedMedia: WaypointMedia[] = [],
+  isRecording: boolean = false
 ) {
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -81,6 +82,24 @@ export function useMapEngine(
       markerCache.clear();
     };
   }, [baseLocation, mapRef]);
+
+  // Update user marker appearance when recording state changes
+  useEffect(() => {
+    const marker = userMarkerRef.current;
+    if (!marker) return;
+
+    const el = marker.getElement();
+    if (isRecording) {
+      el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_20px_rgba(0,82,255,0.7),0_0_60px_rgba(0,82,255,0.3)] flex items-center justify-center relative";
+      el.innerHTML = `
+        <span class="absolute inset-0 rounded-full bg-[#0052FF]/40 animate-ping scale-[2] pointer-events-none" style="animation-duration: 1.2s;" />
+        <span class="absolute inset-0 rounded-full bg-[#0052FF]/20 animate-ping scale-[3] pointer-events-none" style="animation-duration: 1.8s; animation-delay: 0.4s;" />
+      `;
+    } else {
+      el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-4 border-white shadow-[0_2px_10px_rgba(0,82,255,0.4)] flex items-center justify-center relative";
+      el.innerHTML = `<span class="absolute inset-0 rounded-full bg-[#0052FF]/30 animate-ping scale-150 pointer-events-none" style="animation-duration: 2s;" />`;
+    }
+  }, [isRecording]);
 
   const handleLocationStream = (coords: [number, number], heading: number | null) => {
     const map = mapInstanceRef.current;
