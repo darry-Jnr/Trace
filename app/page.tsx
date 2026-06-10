@@ -10,21 +10,22 @@ export default function LandingPage() {
 
       <main className="flex-1 overflow-hidden">
         <section className="px-6 md:px-10 pt-12 md:pt-24 pb-24">
-          <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-24 items-center">
+          <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-24 items-center">
 
             <div className="max-w-xl">
-              <p className="text-sm font-medium text-black/40 mb-5 tracking-tight">
-                Maps show roads. People show the way.
-              </p>
-
               <h1 className="text-5xl md:text-7xl font-semibold tracking-[-0.05em] leading-[0.95]">
-                Show people exactly where to go.
+                <span className="text-black/40">Trace</span>{" "}
+                <span className="text-black/90">— Show people exactly where to go.</span>
               </h1>
 
               <p className="mt-5 lg:mt-7 text-base lg:text-lg text-black/60 font-medium leading-relaxed tracking-tight">
                 Walk the route once, leave photos, notes, or voice messages
                 along the way, and share a single link. Friends follow your
                 exact path and see everything at the right moments.
+              </p>
+
+              <p className="mt-5 text-sm font-medium text-black/35 tracking-tight">
+                Maps show roads. People show the way.
               </p>
 
               <StartTraceButton />
