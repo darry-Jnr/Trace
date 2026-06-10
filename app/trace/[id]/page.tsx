@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import SaveReviewModal from "@/components/trace/overlays/SaveReviewModal";
 
 import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
+import { useReplayGuidance } from "@/hooks/trace/useReplayGuidance";
 import { useMapEngine } from "@/hooks/trace/useMapEngine";
 import { WaypointMedia } from "@/types";
 
@@ -128,6 +129,7 @@ export default function TraceWorkspacePage() {
               setTrailCoordinates(savedTrace.coordinates);
               setReplayBaseLocation(savedTrace.coordinates[0]);
             }
+            savedTrailCoordinatesRef.current = savedTrace.coordinates || [];
             if (savedTrace.waypoints) {
               setSavedMedia(savedTrace.waypoints);
             }
@@ -154,6 +156,7 @@ export default function TraceWorkspacePage() {
               setTrailCoordinates(fetchedTrace.coordinates);
               setReplayBaseLocation(fetchedTrace.coordinates[0]);
             }
+            savedTrailCoordinatesRef.current = fetchedTrace.coordinates || [];
             if (fetchedTrace.waypoints) {
               setSavedMedia(fetchedTrace.waypoints);
             }
@@ -192,15 +195,13 @@ export default function TraceWorkspacePage() {
   // Engine Connection #2: Hardware device telemetry location tracking engine
   // CRITICAL FIX: The GPS tracker is now allowed to run when idle to query the user's initial anchor dot frame
   const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, retryGps } = useGPSTracker(
-    !isReplayMode,
+    isRecording,
     (coords: [number, number], heading: number | null) => {
-      if (!isReplayMode) {
-        // eslint-disable-next-line react-hooks/immutability
-        handleLocationStream(coords, heading);
-      }
+      // eslint-disable-next-line react-hooks/immutability
+      handleLocationStream(coords, heading);
     },
     (updatedPath: [number, number][]) => {
-      if (!isReplayMode && isRecording) {
+      if (isRecording) {
         setTrailCoordinates(updatedPath);
         // eslint-disable-next-line react-hooks/immutability
         updateVectorPath(updatedPath);
@@ -214,16 +215,63 @@ export default function TraceWorkspacePage() {
     toggleViewPerspective,
     handleLocationStream,
     updateVectorPath,
-    centerOnCoords
+    updateGhostPath,
+    setTiltedView,
+    centerOnCoords,
+    setStartPoint,
+    enableFollowMode,
+    disableFollowMode,
   } = useMapEngine(
     mapRef,
     isReplayMode ? replayBaseLocation : baseLocation,
     setActiveWaypoint,
     trailCoordinates,
-    savedMedia
+    isReplayMode ? [] : savedMedia
   );
 
+  // Replay guidance — drives the discovery experience
+  const savedTrailCoordinatesRef = useRef<[number, number][]>([]);
+  const {
+    isSynced,
+    hasStarted,
+    distanceToStart,
+    unlockedWaypoints,
+    activeWaypoint: guidanceWaypoint,
+    startGuidance,
+    dismissWaypoint,
+  } = useReplayGuidance({
+    trailCoordinates: savedTrailCoordinatesRef.current,
+    waypoints: savedMedia,
+    userLocation,
+    isReplayMode,
+  });
 
+  // Set start point marker when replay loads (blue dot)
+  useEffect(() => {
+    if (isReplayMode && savedTrailCoordinatesRef.current.length > 0) {
+      setStartPoint(savedTrailCoordinatesRef.current[0], "blue");
+    } else {
+      setStartPoint(null);
+    }
+  }, [isReplayMode, setStartPoint]);
+
+  // Turn start point green when user arrives (sync)
+  useEffect(() => {
+    if (isReplayMode && isSynced && savedTrailCoordinatesRef.current.length > 0) {
+      setStartPoint(savedTrailCoordinatesRef.current[0], "green");
+    } else if (isReplayMode && !isSynced && savedTrailCoordinatesRef.current.length > 0) {
+      setStartPoint(savedTrailCoordinatesRef.current[0], "blue");
+    }
+  }, [isReplayMode, isSynced, setStartPoint]);
+
+  // Enable follow mode when guidance starts
+  useEffect(() => {
+    if (hasStarted) {
+      enableFollowMode();
+    } else {
+      disableFollowMode();
+    }
+  }, [hasStarted, enableFollowMode, disableFollowMode]);
 
   // Fallback fallback pointer coordinate interceptor
   const getCurrentCapturePoint = () => {
@@ -281,10 +329,12 @@ export default function TraceWorkspacePage() {
     if (isRecording) {
       setIsRecording(false);
       setShowSaveReview(true);
+      (window as any).pendo?.track('Recording Stopped', { traceId: id, waypointCount: savedMedia.length });
     } else {
       setIsRecording(true);
       setIsAddMenuOpen(false);
       setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
+      (window as any).pendo?.track('Recording Started', { traceId: id });
     }
   };
 
@@ -389,15 +439,6 @@ export default function TraceWorkspacePage() {
     setShowSaveReview(false);
   };
 
-  const handleFollowRoute = () => {
-    setIsReplayMode(false);
-    setSavedMedia([]);
-    setShowSaveReview(false);
-    setIsRecording(true);
-    setIsAddMenuOpen(false);
-    toast.info("Following Route", "Recording a new path along this trace guide.");
-  };
-
   // --- LOADER CONFIGURATION DIALS ---
   const loadingMessage = {
     booting: "Preparing workspace",
@@ -442,20 +483,23 @@ export default function TraceWorkspacePage() {
         {/* SIDE DRAWER MARKER NODE SHEETS */}
         <WaypointSheet activeWaypoint={activeWaypoint} onClose={() => setActiveWaypoint(null)} />
 
-        {/* REPLAY PANEL: shown when viewing a saved trace */}
+        {/* REPLAY PANEL: guided discovery for saved traces */}
         {isReplayMode && (
           <ReplayOverlay
             title={traceTitleInput}
             date={traceDate}
             distance={traceDistance}
-            waypoints={savedMedia}
             onBack={() => router.push("/dashboard")}
-            onFollow={handleFollowRoute}
-            onWaypointSelect={(wp) => {
-              centerOnCoords(wp.coordinates);
-              setActiveWaypoint(wp);
+            isSynced={isSynced}
+            hasStarted={hasStarted}
+            distanceToStart={distanceToStart}
+            unlockedWaypoints={unlockedWaypoints}
+            activeWaypoint={guidanceWaypoint}
+            onStartGuidance={() => {
+              startGuidance();
+              setTiltedView(true);
             }}
-            activeWaypointId={activeWaypoint?.id}
+            onDismissWaypoint={dismissWaypoint}
           />
         )}
 

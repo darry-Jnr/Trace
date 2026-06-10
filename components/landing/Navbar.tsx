@@ -40,8 +40,9 @@ export default function Navbar() {
         </Link>
 
         {/* CTA Button */}
-        <Link 
-          href="/dashboard" 
+        <Link
+          href="/dashboard"
+          data-pendo="navbar-get-started"
           className="rounded-[16px] px-5 h-10 bg-black text-white text-sm font-medium flex items-center justify-center shadow-none transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
           Get started
