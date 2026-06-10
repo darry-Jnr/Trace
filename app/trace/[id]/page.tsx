@@ -41,6 +41,7 @@ export default function TraceWorkspacePage() {
   const [recordingStartedAt, setRecordingStartedAt] = useState<string>("");
   const [showStartHint, setShowStartHint] = useState(false);
   const [gpsTimedOut, setGpsTimedOut] = useState(false);
+  const [retryTrigger, setRetryTrigger] = useState(0);
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
@@ -207,6 +208,28 @@ export default function TraceWorkspacePage() {
       }
     }
   );
+
+  // GPS timeout: show error/retry if GPS doesn't fix within 15s
+  useEffect(() => {
+    if (isReplayMode || gpsLoading || hasGpsFix) return;
+
+    gpsTimeoutRef.current = setTimeout(() => {
+      setGpsTimedOut(true);
+    }, 15000);
+
+    return () => {
+      if (gpsTimeoutRef.current) {
+        clearTimeout(gpsTimeoutRef.current);
+        gpsTimeoutRef.current = null;
+      }
+    };
+  }, [isReplayMode, gpsLoading, hasGpsFix, retryTrigger]);
+
+  const handleRetryGps = useCallback(() => {
+    retryGps();
+    setGpsTimedOut(false);
+    setRetryTrigger((t) => t + 1);
+  }, [retryGps]);
 
   // Engine Connection #1: Mapbox canvas lifecycle engine
   const {
@@ -557,7 +580,7 @@ export default function TraceWorkspacePage() {
       )}
 
       {/* BLOCKING HARDWARE LOADING TIMELINE MASK */}
-      <InitialLoader isLoading={showInitialLoader} loadingMessage={loadingMessageStr} onRetry={gpsTimedOut ? retryGps : undefined} />
+      <InitialLoader isLoading={showInitialLoader} loadingMessage={loadingMessageStr} onRetry={gpsTimedOut ? handleRetryGps : undefined} />
     </div>
   );
 }
