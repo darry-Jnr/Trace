@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import { ViewMode, WaypointMedia, CACHE_KEY } from "@/types";
+import { chaikinSmooth } from "./chaikinSmooth";
 
 export function useMapEngine(
   mapRef: React.RefObject<HTMLDivElement | null>,
@@ -190,7 +191,7 @@ export function useMapEngine(
         source.setData({
           type: "Feature",
           properties: {},
-          geometry: { type: "LineString", coordinates: trailCoordinates },
+          geometry: { type: "LineString", coordinates: chaikinSmooth(trailCoordinates) },
         });
       }
     };
@@ -213,7 +214,7 @@ export function useMapEngine(
         source.setData({
           type: "Feature",
           properties: {},
-          geometry: { type: "LineString", coordinates: progressCoords },
+          geometry: { type: "LineString", coordinates: chaikinSmooth(progressCoords) },
         });
       }
     };
@@ -307,7 +308,7 @@ export function useMapEngine(
       source.setData({
         type: "Feature",
         properties: {},
-        geometry: { type: "LineString", coordinates },
+        geometry: { type: "LineString", coordinates: chaikinSmooth(coordinates) },
       });
     }
   };

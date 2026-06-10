@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { LoadingStage, CACHE_KEY } from "@/types";
+import { KalmanFilter } from "./kalmanFilter";
 
 const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
   const R = 6371000;
@@ -33,11 +34,12 @@ export function useGPSTracker(
     setGpsRetryCount((c) => c + 1);
     setHasGpsFix(false);
     setLoadingStage("searching");
+    kalmanFilterRef.current.reset();
   }, []);
 
   const isRecordingRef = useRef(isRecording);
   const pathCoordsRef = useRef<[number, number][]>([]);
-  const smoothedCoordsRef = useRef<[number, number] | null>(null);
+  const kalmanFilterRef = useRef<KalmanFilter>(new KalmanFilter());
 
   // FIX #1 & #2: Store callbacks in stable refs so they never appear in
   // useEffect dependency arrays. This prevents the GPS watchPosition from
@@ -114,15 +116,11 @@ export function useGPSTracker(
 
         if (accuracy > 25 && isRecordingRef.current) return;
 
-        // Smooth coordinates using exponential moving average
-        const prev = smoothedCoordsRef.current;
-        const finalCoords: [number, number] = prev
-          ? [
-              prev[0] * 0.25 + rawLng * 0.75,
-              prev[1] * 0.25 + rawLat * 0.75,
-            ]
-          : [rawLng, rawLat];
-        smoothedCoordsRef.current = finalCoords;
+        const finalCoords = kalmanFilterRef.current.update(
+          [rawLng, rawLat],
+          accuracy,
+          position.timestamp
+        );
 
         setUserLocation(finalCoords);
         setHasGpsFix(true);
