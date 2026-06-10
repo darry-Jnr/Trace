@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Trace
+
+**Show people exactly where to go.**
+
+Walk a route once, drop waypoints (text notes, voice memos, photos), and share a single link. Followers replay your route with proximity-based guidance — they'll know when they're on track, when they've arrived, and what to look for at each stop.
+
+Built with Next.js 16, Mapbox GL JS, and Supabase.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+bun install
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy `.env.local.example` to `.env.local` and fill in:
 
-## Learn More
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Mapbox public access token |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous API key |
 
-To learn more about Next.js, take a look at the following resources:
+### Database
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run the SQL migrations in `supabase/` against your Supabase project to create the required tables and storage buckets:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `supabase/migration_comments.sql` — creates the `comments` table with RLS policies
+- A `traces` table and `trace-media` storage bucket also need to be created (schema not yet migrated to SQL)
 
-## Deploy on Vercel
+## Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Framework:** Next.js 16 (App Router, Turbopack)
+- **Maps:** Mapbox GL JS v3 via react-map-gl v8
+- **Backend:** Supabase (PostgreSQL + Storage)
+- **Styling:** Tailwind CSS v4
+- **Analytics:** Pendo
