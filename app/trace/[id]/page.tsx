@@ -15,6 +15,8 @@ import ControlDeck from "@/components/trace/ControlDeck";
 import WaypointSheet from "@/components/trace/overlays/WaypointSheet";
 import InitialLoader from "@/components/trace/overlays/InitialLoader";
 import ReplayOverlay from "@/components/trace/overlays/ReplayOverlay";
+import CommentSection from "@/components/trace/overlays/CommentSection";
+import NameModal from "@/components/trace/NameModal";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -45,6 +47,31 @@ export default function TraceWorkspacePage() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Comments state
+  const [showComments, setShowComments] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [showPostSaveNameModal, setShowPostSaveNameModal] = useState(false);
+  const [commentName, setCommentName] = useState<string | null>(null);
+  const [isAuthor, setIsAuthor] = useState(false);
+
+  // Check author status, load visitor name, ensure visitor_id
+  useEffect(() => {
+    const stored = localStorage.getItem("saved_traces");
+    if (stored) {
+      try {
+        const traces = JSON.parse(stored);
+        setIsAuthor(traces.some((t: { id: string }) => t.id === id));
+      } catch {}
+    }
+    const storedName = localStorage.getItem("visitor_name");
+    if (storedName) setCommentName(storedName);
+
+    if (!localStorage.getItem("visitor_id")) {
+      const newId = `v_${Math.random().toString(36).substring(2, 10)}`;
+      localStorage.setItem("visitor_id", newId);
+    }
+  }, [id]);
 
   const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
     const R = 6371000;
@@ -347,8 +374,7 @@ export default function TraceWorkspacePage() {
     setIsSaving(true);
     setShowSaveReview(false);
 
-    try {
-      // 1. Upload any pending media files to Supabase Storage
+    // 1. Upload any pending media files to Supabase Storage
       const uploadPromises: Promise<void>[] = [];
       for (const wp of savedMedia) {
       const pendingData = pendingMediaRef.current.get(wp.id);
@@ -433,9 +459,13 @@ export default function TraceWorkspacePage() {
     }
 
     toast.success("Trace Saved Successfully", `"${traceTitleInput}" has been safely archived.`);
-    router.push("/dashboard");
-    } finally {
-      setIsSaving(false);
+    setIsSaving(false);
+
+    // Prompt for name if not set (author flow)
+    if (!localStorage.getItem("visitor_name")) {
+      setShowPostSaveNameModal(true);
+    } else {
+      router.push("/dashboard");
     }
   };
 
@@ -519,8 +549,56 @@ export default function TraceWorkspacePage() {
             onStartGuidance={startGuidance}
             onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}
+            onCommentsClick={() => {
+              const storedName = localStorage.getItem("visitor_name");
+              if (storedName) {
+                setCommentName(storedName);
+                setShowComments(true);
+              } else {
+                setShowNameModal(true);
+              }
+            }}
           />
         )}
+
+        {/* Comment section (replay mode only) */}
+        {isReplayMode && (
+          <CommentSection
+            traceId={id}
+            traceTitle={traceTitleInput}
+            isAuthor={isAuthor}
+            isOpen={showComments}
+            onClose={() => setShowComments(false)}
+            onNameRequired={() => {
+              setShowComments(false);
+              setShowNameModal(true);
+            }}
+            visitorName={commentName}
+          />
+        )}
+
+        {/* Name modal (for first-time commenters) */}
+        <NameModal
+          isOpen={showNameModal}
+          onComplete={(name) => {
+            setCommentName(name);
+            setShowNameModal(false);
+            // If they were trying to comment, reopen comments
+            if (!showComments) setShowComments(true);
+          }}
+          title="What should we call you?"
+        />
+
+        {/* Name modal (after saving a trace, author flow) */}
+        <NameModal
+          isOpen={showPostSaveNameModal}
+          onComplete={(name) => {
+            setCommentName(name);
+            setShowPostSaveNameModal(false);
+            router.push("/dashboard");
+          }}
+          title="What should we call you?"
+        />
 
         {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
         {!showInitialLoader && !isReplayMode && (

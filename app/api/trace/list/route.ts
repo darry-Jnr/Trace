@@ -23,7 +23,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data });
+    // Fetch comment counts for these traces
+    const { data: commentCounts, error: countError } = await supabase
+      .from("comments")
+      .select("trace_id")
+      .in("trace_id", ids);
+
+    const countMap: Record<string, number> = {};
+    if (!countError && commentCounts) {
+      for (const c of commentCounts) {
+        countMap[c.trace_id] = (countMap[c.trace_id] || 0) + 1;
+      }
+    }
+
+    const enriched = data.map((trace) => ({
+      ...trace,
+      comment_count: countMap[trace.id] || 0,
+    }));
+
+    return NextResponse.json({ success: true, data: enriched });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

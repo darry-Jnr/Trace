@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import TraceCard from "./TraceCard";
+import CommentSlideOver from "./CommentSlideOver";
+import NameModal from "@/components/trace/NameModal";
 
 const recentTraces = [
     { id: "1", title: "Wedding Hall", owner: "Sarah", date: "June 5, 2026", link: "Shared by Sarah" },
@@ -15,12 +17,27 @@ const recentTraces = [
 const Main = () => {
     const router = useRouter();
     const toast = useToast();
-    const [myTraces, setMyTraces] = useState<{ id: string; title: string; link: string; date: string; }[]>([]);
+    const [myTraces, setMyTraces] = useState<{ id: string; title: string; link: string; date: string; distance?: string; commentCount?: number; }[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Multi-Select States
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+    // Comment slide-over state
+    const [commentTraceId, setCommentTraceId] = useState<string | null>(null);
+    const [showCommentSlideOver, setShowCommentSlideOver] = useState(false);
+    const [showDashNameModal, setShowDashNameModal] = useState(false);
+    const [dashVisitorName, setDashVisitorName] = useState<string | null>(null);
+    const [pendingCommentTraceId, setPendingCommentTraceId] = useState<string | null>(null);
+
+    useEffect(() => {
+      const storedName = localStorage.getItem("visitor_name");
+      if (storedName) setDashVisitorName(storedName);
+      if (!localStorage.getItem("visitor_id")) {
+        localStorage.setItem("visitor_id", `v_${Math.random().toString(36).substring(2, 10)}`);
+      }
+    }, []);
 
     useEffect(() => {
         async function fetchTraces() {
@@ -55,6 +72,8 @@ const Main = () => {
                             title: t.title,
                             link: `${window.location.origin}/trace/${t.id}`,
                             date: t.date,
+                            distance: t.distance,
+                            commentCount: t.comment_count ?? 0,
                         }));
                         setMyTraces(serverTraces);
                         setIsLoaded(true);
@@ -62,7 +81,25 @@ const Main = () => {
                     }
                 }
 
-                // Fallback to local storage if API call fails
+                // Fallback to local storage if API call fails — fetch comment counts separately
+                try {
+                    const countRes = await fetch("/api/trace/list/comments/counts", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ids }),
+                    });
+                    if (countRes.ok) {
+                        const countResult = await countRes.json();
+                        if (countResult.success) {
+                            const merged = localTraces.map((t: any) => ({
+                                ...t,
+                                commentCount: countResult.data[t.id] || 0,
+                            }));
+                            setMyTraces(merged);
+                            return;
+                        }
+                    }
+                } catch {}
                 setMyTraces(localTraces);
             } catch (e) {
                 console.error("Failed loading traces:", e);
@@ -80,6 +117,27 @@ const Main = () => {
     const handleNewTrace = () => {
         const newId = Math.random().toString(36).substring(2, 9);
         router.push(`/trace/${newId}`);
+    };
+
+    const handleCommentClick = (traceId: string) => {
+        setPendingCommentTraceId(traceId);
+        const storedName = localStorage.getItem("visitor_name");
+        if (storedName) {
+            setDashVisitorName(storedName);
+            setCommentTraceId(traceId);
+            setShowCommentSlideOver(true);
+        } else {
+            setShowDashNameModal(true);
+        }
+    };
+
+    const handleDashNameComplete = (name: string) => {
+        setDashVisitorName(name);
+        setShowDashNameModal(false);
+        if (pendingCommentTraceId) {
+            setCommentTraceId(pendingCommentTraceId);
+            setShowCommentSlideOver(true);
+        }
     };
 
     // Selection handlers
@@ -213,6 +271,8 @@ const Main = () => {
                                         title={trace.title}
                                         link={trace.link}
                                         date={trace.date}
+                                        commentCount={trace.commentCount}
+                                        distance={trace.distance}
                                         isSelectMode={isSelectMode}
                                         isSelected={selectedIds.includes(trace.id)}
                                         onSelectToggle={() => toggleSelectId(trace.id)}
@@ -223,6 +283,7 @@ const Main = () => {
                                             toast.success("Link Copied", "Trace link copied to clipboard.");
                                         }}
                                         onClick={() => router.push(`/trace/${trace.id}`)}
+                                        onCommentClick={() => handleCommentClick(trace.id)}
                                     />
                                 ))
                             ) : (
@@ -304,6 +365,36 @@ const Main = () => {
                     </div>
                 </section>
             </div>
+
+            {/* Comment slide-over */}
+            <CommentSlideOver
+                traceId={commentTraceId || ""}
+                traceTitle={myTraces.find((t) => t.id === commentTraceId)?.title || ""}
+                isAuthor={commentTraceId ? myTraces.some((t) => t.id === commentTraceId) : false}
+                isOpen={showCommentSlideOver && !!commentTraceId}
+                onClose={() => setShowCommentSlideOver(false)}
+                onNameRequired={() => {
+                    setShowCommentSlideOver(false);
+                    setShowDashNameModal(true);
+                }}
+                onCommentAdded={() => {
+                    if (commentTraceId) {
+                        setMyTraces((prev) => prev.map((t) =>
+                            t.id === commentTraceId
+                                ? { ...t, commentCount: (t.commentCount || 0) + 1 }
+                                : t
+                        ));
+                    }
+                }}
+                visitorName={dashVisitorName}
+            />
+
+            {/* Name modal for first-time commenters */}
+            <NameModal
+                isOpen={showDashNameModal}
+                onComplete={handleDashNameComplete}
+                title="What should we call you?"
+            />
         </main>
     );
 };

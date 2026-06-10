@@ -12,6 +12,7 @@ interface ReplayOverlayProps {
   onStartGuidance: () => void;
   onDismissWaypoint: () => void;
   onBack: () => void;
+  onCommentsClick: () => void;
 }
 
 function formatDistance(meters: number): string {
@@ -27,6 +28,7 @@ export default function ReplayOverlay({
   onStartGuidance,
   onDismissWaypoint,
   onBack,
+  onCommentsClick,
 }: ReplayOverlayProps) {
   const [showSyncAnimation, setShowSyncAnimation] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
@@ -68,6 +70,17 @@ export default function ReplayOverlay({
         <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 12H5" />
           <path d="M12 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      {/* Comments button — below back button */}
+      <button
+        onClick={onCommentsClick}
+        className="absolute top-[68px] left-5 z-40 w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
+        title="Comments"
+      >
+        <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
       </button>
 
