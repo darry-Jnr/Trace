@@ -64,6 +64,7 @@ export default function TraceWorkspacePage() {
   const [gpsTimedOut, setGpsTimedOut] = useState(false);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [savePhase, setSavePhase] = useState<"idle" | "saving" | "success">("idle");
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -400,7 +401,7 @@ export default function TraceWorkspacePage() {
   const handleCommitSaveTrace = async () => {
     if (isSaving) return;
     setIsSaving(true);
-    setShowSaveReview(false);
+    setSavePhase("saving");
 
     // 1. Upload any pending media files to Supabase Storage
       const uploadPromises: Promise<void>[] = [];
@@ -488,8 +489,11 @@ export default function TraceWorkspacePage() {
 
     toast.success("Trace Saved Successfully", `"${traceTitleInput}" has been safely archived.`);
     setIsSaving(false);
+    setSavePhase("success");
 
-    // Prompt for name if not set (author flow)
+    // Wait a beat so user sees the "Saved!" state, then navigate
+    await new Promise((r) => setTimeout(r, 800));
+
     if (!localStorage.getItem("visitor_name")) {
       setShowPostSaveNameModal(true);
     } else {
@@ -723,6 +727,7 @@ export default function TraceWorkspacePage() {
           onSave={handleCommitSaveTrace}
           points={trailCoordinates}
           isSaving={isSaving}
+          savePhase={savePhase}
           createdAt={recordingStartedAt}
         />
       )}
