@@ -670,7 +670,7 @@ export default function TraceWorkspacePage() {
             <LocationStatus hasGpsFix={hasGpsFix} gpsTimedOut={gpsTimedOut} onRetry={retryGps} />
             <RecordingTimer isRecording={isRecording} />
 
-            {/* Bottom-right: zoom + re-center */}
+            {/* Bottom-right: zoom + re-center (desktop) */}
             <div className="hidden md:flex absolute bottom-5 right-5 z-40 flex-col items-center gap-2">
               <button
                 onClick={() => userLocation && centerOnCoords(userLocation)}
@@ -699,6 +699,20 @@ export default function TraceWorkspacePage() {
                   <span className="text-[16px] font-semibold text-black/40 leading-none">−</span>
                 </button>
               </div>
+            </div>
+
+            {/* Mobile: re-center only (bottom-left), hides when ActionDock is open */}
+            <div className={`md:hidden absolute bottom-5 left-5 z-40 transition-opacity duration-200 ${isRecording && isAddMenuOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+              <button
+                onClick={() => userLocation && centerOnCoords(userLocation)}
+                className="w-10 h-10 rounded-xl bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200"
+                title="Re-center on location"
+              >
+                <svg className="w-[16px] h-[16px] text-black/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                </svg>
+              </button>
             </div>
 
           </>
