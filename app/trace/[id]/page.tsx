@@ -408,6 +408,7 @@ export default function TraceWorkspacePage() {
     if (isRecording) {
       setIsRecording(false);
       setTrailCoordinates(trailCoordsRef.current);
+      updateVectorPath(trailCoordsRef.current);
       setShowSaveReview(true);
     } else {
       setIsRecording(true);
