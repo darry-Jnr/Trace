@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type mapboxgl from "mapbox-gl";
 import { ViewMode, WaypointMedia, WaypointGroup, groupWaypoints, CACHE_KEY } from "@/types";
 import { chaikinSmooth } from "./chaikinSmooth";
+import { douglasPeucker } from "./douglasPeucker";
 
 export function useMapEngine(
   mapRef: React.RefObject<HTMLDivElement | null>,
@@ -328,9 +329,10 @@ export function useMapEngine(
     const source = map.getSource("recording-trail-source") as mapboxgl.GeoJSONSource;
     if (source) {
       const now = Date.now();
-      const coords = smooth && (now - lastSmoothRef.current > 2000 || coordinates.length < 10)
-        ? chaikinSmooth(coordinates)
-        : coordinates;
+      const simplified = douglasPeucker(coordinates, 2);
+      const coords = smooth && (now - lastSmoothRef.current > 2000 || simplified.length < 10)
+        ? chaikinSmooth(simplified)
+        : simplified;
       if (smooth) lastSmoothRef.current = now;
       source.setData({
         type: "Feature",
