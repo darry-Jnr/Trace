@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, Pin, PinOff, Send, X } from "lucide-react";
+import { MessageSquare, Pin, PinOff, Send, Trash2, X } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 
 interface Comment {
   id: string;
@@ -50,6 +51,8 @@ export default function CommentSection({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -99,8 +102,12 @@ export default function CommentSection({
         setTimeout(() => {
           listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
         }, 100);
+      } else {
+        toast.error("Failed to post", result.error || "Something went wrong");
       }
-    } catch {}
+    } catch {
+      toast.error("Failed to post", "Could not save your comment. Please try again.");
+    }
     setSending(false);
   };
 
@@ -116,8 +123,34 @@ export default function CommentSection({
             c.id === commentId ? { ...c, is_pinned: !c.is_pinned } : c
           )
         );
+      } else {
+        toast.error("Failed to pin", result.error || "Something went wrong");
       }
-    } catch {}
+    } catch {
+      toast.error("Failed to pin", "Could not update pin status.");
+    }
+  };
+
+  const handleDelete = async (commentId: string) => {
+    setDeletingIds((prev) => new Set(prev).add(commentId));
+    try {
+      const res = await fetch(`/api/trace/${traceId}/comments/${commentId}`, {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (result.success) {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+      } else {
+        toast.error("Failed to delete", result.error || "Something went wrong");
+      }
+    } catch {
+      toast.error("Failed to delete", "Could not remove comment.");
+    }
+    setDeletingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(commentId);
+      return next;
+    });
   };
 
   if (!isOpen) return null;
@@ -165,6 +198,8 @@ export default function CommentSection({
                   comment={pinnedComment}
                   isAuthor={isAuthor}
                   onPinToggle={handleTogglePin}
+                  onDelete={handleDelete}
+                  isDeleting={deletingIds.has(pinnedComment.id)}
                 />
               </div>
             )}
@@ -174,6 +209,8 @@ export default function CommentSection({
                 comment={comment}
                 isAuthor={isAuthor}
                 onPinToggle={handleTogglePin}
+                onDelete={handleDelete}
+                isDeleting={deletingIds.has(comment.id)}
               />
             ))}
           </>
@@ -216,10 +253,14 @@ function CommentRow({
   comment,
   isAuthor,
   onPinToggle,
+  onDelete,
+  isDeleting,
 }: {
   comment: Comment;
   isAuthor: boolean;
   onPinToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
 }) {
   return (
     <div className="rounded-2xl bg-white border border-black/[0.04] p-3.5">
@@ -237,18 +278,32 @@ function CommentRow({
             {comment.content}
           </p>
         </div>
-        {isAuthor && comment.is_pinned && (
-          <button
-            onClick={() => onPinToggle(comment.id)}
-            className="w-7 h-7 rounded-full bg-black/[0.03] flex items-center justify-center shrink-0 active:scale-90 transition-transform hover:bg-black/[0.06]"
-            title={comment.is_pinned ? "Unpin" : "Pin"}
-          >
-            {comment.is_pinned ? (
-              <PinOff className="w-3 h-3 text-black/40" />
-            ) : (
-              <Pin className="w-3 h-3 text-black/30" />
-            )}
-          </button>
+        {isAuthor && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onPinToggle(comment.id)}
+              className="w-7 h-7 rounded-full bg-black/[0.03] flex items-center justify-center shrink-0 active:scale-90 transition-transform hover:bg-black/[0.06]"
+              title={comment.is_pinned ? "Unpin" : "Pin"}
+            >
+              {comment.is_pinned ? (
+                <PinOff className="w-3 h-3 text-black/40" />
+              ) : (
+                <Pin className="w-3 h-3 text-black/30" />
+              )}
+            </button>
+            <button
+              onClick={() => onDelete(comment.id)}
+              disabled={isDeleting}
+              className="w-7 h-7 rounded-full bg-black/[0.03] flex items-center justify-center shrink-0 active:scale-90 transition-transform hover:bg-red-50 disabled:opacity-30"
+              title="Delete"
+            >
+              {isDeleting ? (
+                <div className="w-3 h-3 rounded-full border-2 border-black/20 border-t-black animate-spin" />
+              ) : (
+                <Trash2 className="w-3 h-3 text-black/30" />
+              )}
+            </button>
+          </div>
         )}
       </div>
     </div>

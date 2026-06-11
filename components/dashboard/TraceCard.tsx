@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { CornerUpRight, Copy, Trash2, MessageSquare, MoreVertical, Route, Clock, X, AlertTriangle, Pencil } from "lucide-react";
+import { CornerUpRight, Copy, Trash2, MoreVertical, Route, Clock, X, AlertTriangle, Pencil } from "lucide-react";
 
 interface TraceCardProps {
   title: string;
   link: string;
   date: string;
   distance?: string;
-  commentCount?: number;
+
   isRecent?: boolean;
   isSelectMode?: boolean;
   isSelected?: boolean;
@@ -18,7 +18,7 @@ interface TraceCardProps {
   onLongPress?: () => void;
   onShare?: () => void;
   onClick?: () => void;
-  onCommentClick?: () => void;
+
 }
 
 const TraceCard = ({
@@ -26,7 +26,6 @@ const TraceCard = ({
   link,
   date,
   distance,
-  commentCount,
   isRecent = false,
   isSelectMode = false,
   isSelected = false,
@@ -36,7 +35,6 @@ const TraceCard = ({
   onLongPress,
   onShare,
   onClick,
-  onCommentClick,
 }: TraceCardProps) => {
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -155,27 +153,6 @@ const TraceCard = ({
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-2 sm:ml-3">
-          {/* Comment icon */}
-          {!isSelectMode && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCommentClick?.();
-              }}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all cursor-pointer hover:bg-black/[0.05] active:scale-90 ${
-                commentCount && commentCount > 0
-                  ? 'text-black/40 hover:text-black'
-                  : 'text-black/[0.12] hover:text-black/40'
-              }`}
-              title="Comments"
-            >
-              <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              {commentCount !== undefined && commentCount > 0 && (
-                <span className="ml-1 text-[12px] font-medium">{commentCount}</span>
-              )}
-            </button>
-          )}
-
           {/* More icon — dropdown on mobile & desktop */}
           {!isSelectMode && (
             <div className="relative" ref={menuRef}>

@@ -27,9 +27,24 @@ export async function POST(
       return NextResponse.json({ error: "Comment not found" }, { status: 404 });
     }
 
+    const newPinned = !comment.is_pinned;
+
+    // If pinning, unpin any other currently pinned comment first
+    if (newPinned) {
+      const { error: unpinError } = await supabase
+        .from("comments")
+        .update({ is_pinned: false })
+        .eq("trace_id", id)
+        .eq("is_pinned", true);
+
+      if (unpinError) {
+        return NextResponse.json({ error: unpinError.message }, { status: 500 });
+      }
+    }
+
     const { data, error } = await supabase
       .from("comments")
-      .update({ is_pinned: !comment.is_pinned })
+      .update({ is_pinned: newPinned })
       .eq("id", commentId)
       .eq("trace_id", id)
       .select()

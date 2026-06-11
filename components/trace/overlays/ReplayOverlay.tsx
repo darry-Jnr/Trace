@@ -73,10 +73,10 @@ export default function ReplayOverlay({
         </svg>
       </button>
 
-      {/* Comments button — below back button */}
+      {/* Comments button — middle-right (TikTok style) */}
       <button
         onClick={onCommentsClick}
-        className="absolute top-[68px] left-5 z-40 w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
+        className="absolute top-1/2 right-5 -translate-y-1/2 z-40 w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
         title="Comments"
       >
         <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
