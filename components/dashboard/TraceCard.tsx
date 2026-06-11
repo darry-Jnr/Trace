@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { CornerUpRight, Copy, Trash2, MessageSquare, MoreVertical, Route, Clock, X, AlertTriangle } from "lucide-react";
+import { CornerUpRight, Copy, Trash2, MessageSquare, MoreVertical, Route, Clock, X, AlertTriangle, Pencil } from "lucide-react";
 
 interface TraceCardProps {
   title: string;
@@ -14,6 +14,7 @@ interface TraceCardProps {
   isSelected?: boolean;
   onSelectToggle?: () => void;
   onDelete?: () => void;
+  onRename?: (newTitle: string) => void;
   onLongPress?: () => void;
   onShare?: () => void;
   onClick?: () => void;
@@ -41,6 +42,8 @@ const TraceCard = ({
   const [showMenu, setShowMenu] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRename, setShowRename] = useState(false);
+  const [renameValue, setRenameValue] = useState(title);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -203,6 +206,18 @@ const TraceCard = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowMenu(false);
+                      setRenameValue(title);
+                      setShowRename(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-black/70 hover:bg-black/[0.03] active:bg-black/[0.06] transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Rename
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
                       setShowDetail(true);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-black/70 hover:bg-black/[0.03] active:bg-black/[0.06] transition-colors"
@@ -274,6 +289,63 @@ const TraceCard = ({
                   <p className="text-[14px] font-medium text-black/80 mt-0.5 truncate">{link}</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename modal — centered */}
+      {showRename && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={() => setShowRename(false)}>
+          <div className="absolute inset-0 bg-black/20 animate-fade-in" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-white w-[340px] rounded-[28px] p-6 animate-scale-up-modal shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-[20px] font-bold tracking-tight text-black">
+                Rename trace
+              </h3>
+              <button
+                onClick={() => setShowRename(false)}
+                className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center active:scale-90 transition-transform shrink-0"
+              >
+                <X className="w-3.5 h-3.5 text-black/50" />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              placeholder="Trace name"
+              maxLength={40}
+              autoFocus
+              className="w-full h-12 px-4 rounded-2xl bg-[#f5f5f7] border border-transparent focus:border-black/10 focus:bg-white outline-none transition text-[15px] font-medium tracking-tight placeholder:text-black/25"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && renameValue.trim()) {
+                  setShowRename(false);
+                  onRename?.(renameValue.trim());
+                }
+              }}
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => setShowRename(false)}
+                className="flex-1 h-11 rounded-2xl bg-[#f5f5f7] text-[13px] font-semibold text-black/50 active:scale-[0.98] transition-transform"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (renameValue.trim()) {
+                    setShowRename(false);
+                    onRename?.(renameValue.trim());
+                  }
+                }}
+                className="flex-1 h-11 rounded-2xl bg-black text-white text-[13px] font-semibold active:scale-[0.98] transition-transform"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

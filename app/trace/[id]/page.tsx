@@ -19,6 +19,7 @@ import ReplayOverlay from "@/components/trace/overlays/ReplayOverlay";
 import NameModal from "@/components/trace/NameModal";
 import RecordingTimer from "@/components/trace/RecordingTimer";
 import LocationStatus from "@/components/trace/LocationStatus";
+import StopReviewBar from "@/components/trace/overlays/StopReviewBar";
 
 const SaveReviewModal = dynamic(
   () => import("@/components/trace/overlays/SaveReviewModal"),
@@ -403,9 +404,17 @@ export default function TraceWorkspacePage() {
     (window as any).pendo?.track('Moment Added', { type: 'image', traceId: id });
   };
 
+  const getNextUntitledTitle = () => {
+    let counter = parseInt(localStorage.getItem("untitled_counter") || "0", 10);
+    counter += 1;
+    localStorage.setItem("untitled_counter", String(counter));
+    return `Untitled ${counter}`;
+  };
+
   const handleToggleRecord = () => {
     if (isRecording) {
       setIsRecording(false);
+      setTraceTitleInput(getNextUntitledTitle());
       setTrailCoordinates(trailCoordsRef.current);
       updateVectorPath(trailCoordsRef.current);
       setShowSaveReview(true);
@@ -523,6 +532,17 @@ export default function TraceWorkspacePage() {
     setShowSaveReview(false);
   };
 
+  const handleDiscardTrace = () => {
+    setShowSaveReview(false);
+    setTrailCoordinates([]);
+    trailCoordsRef.current = [];
+    totalDistanceRef.current = 0;
+    lastCoordRef.current = null;
+    setSavedMedia([]);
+    setTraceDistance("0.0 mi");
+    toast.info("Trace discarded");
+  };
+
   // --- LOADER CONFIGURATION DIALS ---
   const loadingMessage = {
     booting: "Preparing workspace",
@@ -637,7 +657,7 @@ export default function TraceWorkspacePage() {
         />
 
         {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
-        {!showInitialLoader && !isReplayMode && (
+        {!showInitialLoader && !isReplayMode && !showSaveReview && (
           <>
             {/* Top-left button group */}
             {!isRecording && (
@@ -719,21 +739,34 @@ export default function TraceWorkspacePage() {
         )}
       </div>
 
-      {/* POST-RECORDING SAVE REVIEW MODAL */}
+      {/* POST-RECORDING SAVE REVIEW MODAL (desktop) */}
       {!isReplayMode && (
-        <SaveReviewModal
-          isOpen={showSaveReview}
-          onClose={handleCloseSaveReview}
-          title={traceTitleInput}
-          onTitleChange={setTraceTitleInput}
-          waypointCount={savedMedia.length}
-          distance={traceDistance}
-          onSave={handleCommitSaveTrace}
-          points={trailCoordinates}
-          isSaving={isSaving}
-          savePhase={savePhase}
-          createdAt={recordingStartedAt}
-        />
+        <div className="hidden md:block">
+          <SaveReviewModal
+            isOpen={showSaveReview}
+            onClose={handleCloseSaveReview}
+            title={traceTitleInput}
+            onTitleChange={setTraceTitleInput}
+            waypointCount={savedMedia.length}
+            distance={traceDistance}
+            onSave={handleCommitSaveTrace}
+            points={trailCoordinates}
+            isSaving={isSaving}
+            savePhase={savePhase}
+            createdAt={recordingStartedAt}
+          />
+        </div>
+      )}
+
+      {/* Mobile: stop review bar (bottom) */}
+      {!isReplayMode && showSaveReview && !isRecording && (
+        <div className="md:hidden">
+          <StopReviewBar
+            distance={traceDistance}
+            onDiscard={handleDiscardTrace}
+            onSave={() => handleCommitSaveTrace()}
+          />
+        </div>
       )}
 
       {/* BLOCKING HARDWARE LOADING TIMELINE MASK */}

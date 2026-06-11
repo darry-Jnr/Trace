@@ -140,6 +140,28 @@ const Main = () => {
         }
     };
 
+    const handleRenameTrace = (traceId: string, newTitle: string) => {
+      setMyTraces((prev) => prev.map((t) => t.id === traceId ? { ...t, title: newTitle } : t));
+      try {
+        const stored = localStorage.getItem("saved_traces");
+        if (stored) {
+          const localTraces = JSON.parse(stored);
+          const updated = localTraces.map((t: { id: string; title: string }) =>
+            t.id === traceId ? { ...t, title: newTitle } : t
+          );
+          localStorage.setItem("saved_traces", JSON.stringify(updated));
+        }
+      } catch (e) {
+        console.error("LocalStorage rename error:", e);
+      }
+      fetch(`/api/trace/${traceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle }),
+      }).catch((e) => console.error("Supabase rename error:", e));
+      toast.success("Renamed", `Trace renamed to "${newTitle}".`);
+    };
+
     // Selection handlers
     const toggleSelectId = (id: string) => {
         setSelectedIds((prev) =>
@@ -278,6 +300,7 @@ const Main = () => {
                                         onSelectToggle={() => toggleSelectId(trace.id)}
                                         onLongPress={() => handleLongPress(trace.id)}
                                         onDelete={() => handleDeleteTraces([trace.id])}
+                                        onRename={(newTitle) => handleRenameTrace(trace.id, newTitle)}
                                         onShare={() => {
                                             navigator.clipboard.writeText(trace.link);
                                             toast.success("Link Copied", "Trace link copied to clipboard.");
