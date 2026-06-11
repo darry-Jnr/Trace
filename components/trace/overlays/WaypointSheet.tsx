@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Camera, Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Camera, Play, Pause, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { WaypointMedia } from "@/types";
+import ImageLightbox from "./ImageLightbox";
 
 const WAVE_BARS = [3, 8, 4, 12, 6, 15, 8, 18, 10, 20, 12, 22, 10, 18, 8, 14, 6, 16, 10, 20, 14, 24, 12, 22, 10, 18, 8, 16, 6, 14, 8, 18, 12, 22, 14, 24, 10, 18, 6, 12];
 
@@ -22,6 +23,7 @@ export default function WaypointSheet({ activeWaypoint, groupItems, groupIndex, 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
+  const [showLightbox, setShowLightbox] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   if (!activeWaypoint) return null;
@@ -85,6 +87,7 @@ export default function WaypointSheet({ activeWaypoint, groupItems, groupIndex, 
   };
 
   return (
+    <>
     <div className="absolute inset-x-0 bottom-0 z-50 flex justify-center p-4 md:pb-6 pointer-events-none">
       <div className="bg-white/95 backdrop-blur-xl w-full md:max-w-md rounded-[28px] border border-black/[0.04] shadow-[0_-10px_40px_rgba(0,0,0,0.06),0_20px_50px_rgba(0,0,0,0.1)] p-6 relative pointer-events-auto animate-slide-up-sheet overflow-hidden">
         <button onClick={onClose} className="absolute top-4 right-4 text-black/30 hover:text-black w-6 h-6 flex items-center justify-center rounded-full bg-black/[0.03] transition-colors">
@@ -109,12 +112,20 @@ export default function WaypointSheet({ activeWaypoint, groupItems, groupIndex, 
         {activeWaypoint.type === "image" && (
           <div className="space-y-3.5">
             {imageSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imageSrc}
-                alt="Captured Snapshot"
-                className="w-full aspect-[16/10] object-cover rounded-[20px] border border-black/[0.05]"
-              />
+              <div className="relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageSrc}
+                  alt="Captured Snapshot"
+                  className="w-full aspect-[16/10] object-cover rounded-[20px] border border-black/[0.05]"
+                />
+                <button
+                  onClick={() => setShowLightbox(true)}
+                  className="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg bg-black/40 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity active:scale-90 md:opacity-100"
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
             ) : (
               <div className="w-full aspect-[16/10] bg-black/[0.03] border border-black/[0.05] rounded-[20px] flex flex-col items-center justify-center text-black/20">
                 <Camera className="w-8 h-8 stroke-[1.5] mb-1" />
@@ -231,5 +242,10 @@ export default function WaypointSheet({ activeWaypoint, groupItems, groupIndex, 
         )}
       </div>
     </div>
+
+      {showLightbox && imageSrc && (
+        <ImageLightbox src={imageSrc} onClose={() => setShowLightbox(false)} />
+      )}
+    </>
   );
 }
