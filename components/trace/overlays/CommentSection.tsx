@@ -162,7 +162,7 @@ export default function CommentSection({
     <>
       {/* Backdrop */}
       <div className="absolute inset-0 z-40 bg-black/20 animate-fade-in" onClick={onClose} />
-      <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col bg-white animate-slide-up-sheet rounded-t-2xl max-h-[55vh] shadow-[0_-10px_40px_rgba(0,0,0,0.12)]">
+      <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col bg-white animate-slide-up-sheet rounded-t-2xl max-h-[85vh] shadow-[0_-10px_40px_rgba(0,0,0,0.12)]">
       {/* Handle */}
       <div className="flex justify-center pt-3 pb-1 shrink-0">
         <div className="w-8 h-1 rounded-full bg-black/15" />

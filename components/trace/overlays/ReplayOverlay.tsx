@@ -83,8 +83,7 @@ export default function ReplayOverlay({
           title="Comments"
         >
           <svg className="w-5 h-5 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="4" width="20" height="14" rx="2" />
-            <path d="M16 10h.01M12 10h.01M8 10h.01" strokeWidth="2" />
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </button>
         {commentCount > 0 && (
