@@ -65,6 +65,9 @@ export default function TraceWorkspacePage() {
   const [retryTrigger, setRetryTrigger] = useState(0);
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [savePhase, setSavePhase] = useState<"idle" | "saving" | "success">("idle");
+  const trailCoordsRef = useRef<[number, number][]>([]);
+  const totalDistanceRef = useRef(0);
+  const lastCoordRef = useRef<[number, number] | null>(null);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -103,6 +106,11 @@ export default function TraceWorkspacePage() {
       Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  };
+
+  const formatDistanceFromMeters = (totalMeters: number) => {
+    const miles = totalMeters / 1609.344;
+    return `${miles.toFixed(1)} mi`;
   };
 
   const formatDistance = (coords: [number, number][]) => {
@@ -247,9 +255,17 @@ export default function TraceWorkspacePage() {
     },
     (updatedPath: [number, number][]) => {
       if (!isReplayMode && isRecording) {
-        setTrailCoordinates(updatedPath);
-        // eslint-disable-next-line react-hooks/immutability
-        updateVectorPath(updatedPath);
+        trailCoordsRef.current = updatedPath;
+        updateVectorPath(updatedPath, false);
+
+        if (updatedPath.length >= 2) {
+          const last = updatedPath[updatedPath.length - 1];
+          if (last !== lastCoordRef.current) {
+            totalDistanceRef.current += getDistanceMeters(updatedPath[updatedPath.length - 2], last);
+            lastCoordRef.current = last;
+            setTraceDistance(formatDistanceFromMeters(totalDistanceRef.current));
+          }
+        }
       }
     }
   );
@@ -334,7 +350,8 @@ export default function TraceWorkspacePage() {
 
   // Fallback fallback pointer coordinate interceptor
   const getCurrentCapturePoint = () => {
-    return userLocation || baseLocation || trailCoordinates[trailCoordinates.length - 1] || [37.7749, -122.4194];
+    const coords = trailCoordsRef.current;
+    return userLocation || baseLocation || coords[coords.length - 1] || [37.7749, -122.4194];
   };
 
   // --- INTERACTION INLINE DATA DISPATCHERS ---
@@ -390,6 +407,7 @@ export default function TraceWorkspacePage() {
   const handleToggleRecord = () => {
     if (isRecording) {
       setIsRecording(false);
+      setTrailCoordinates(trailCoordsRef.current);
       setShowSaveReview(true);
     } else {
       setIsRecording(true);

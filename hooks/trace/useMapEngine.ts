@@ -26,6 +26,7 @@ export function useMapEngine(
   const [mapError, setMapError] = useState<string | null>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mapboxglRef = useRef<any>(null);
+  const lastSmoothRef = useRef(0);
 
   // Mount Instance Mapbox Canvas
   useEffect(() => {
@@ -321,15 +322,20 @@ export function useMapEngine(
     });
   }, [unlockedWaypointIds, isReplayMode]);
 
-  const updateVectorPath = (coordinates: [number, number][]) => {
+  const updateVectorPath = (coordinates: [number, number][], smooth = true) => {
     const map = mapInstanceRef.current;
     if (!map) return;
     const source = map.getSource("recording-trail-source") as mapboxgl.GeoJSONSource;
     if (source) {
+      const now = Date.now();
+      const coords = smooth && (now - lastSmoothRef.current > 2000 || coordinates.length < 10)
+        ? chaikinSmooth(coordinates)
+        : coordinates;
+      if (smooth) lastSmoothRef.current = now;
       source.setData({
         type: "Feature",
         properties: {},
-        geometry: { type: "LineString", coordinates: chaikinSmooth(coordinates) },
+        geometry: { type: "LineString", coordinates: coords },
       });
     }
   };
