@@ -237,7 +237,7 @@ function CommentRow({
             {comment.content}
           </p>
         </div>
-        {isAuthor && (
+        {isAuthor && comment.is_pinned && (
           <button
             onClick={() => onPinToggle(comment.id)}
             className="w-7 h-7 rounded-full bg-black/[0.03] flex items-center justify-center shrink-0 active:scale-90 transition-transform hover:bg-black/[0.06]"
