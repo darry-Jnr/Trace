@@ -247,7 +247,7 @@ export default function TraceWorkspacePage() {
   // Engine Connection #2: Hardware device telemetry location tracking engine
   // Always runs — recording mode tracks path, replay mode tracks follower
   const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, retryGps } = useGPSTracker(
-    true,
+    isRecording,
     (coords: [number, number], heading: number | null) => {
       // eslint-disable-next-line react-hooks/immutability
       handleLocationStream(coords, heading);
