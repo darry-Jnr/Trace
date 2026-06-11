@@ -159,9 +159,16 @@ export default function CommentSection({
   const regularComments = comments.filter((c) => !c.is_pinned);
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-white animate-slide-up-sheet">
+    <>
+      {/* Backdrop */}
+      <div className="absolute inset-0 z-40 bg-black/20 animate-fade-in" onClick={onClose} />
+      <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col bg-white animate-slide-up-sheet rounded-t-2xl max-h-[55vh] shadow-[0_-10px_40px_rgba(0,0,0,0.12)]">
+      {/* Handle */}
+      <div className="flex justify-center pt-3 pb-1 shrink-0">
+        <div className="w-8 h-1 rounded-full bg-black/15" />
+      </div>
       {/* Header */}
-      <header className="h-14 px-5 flex items-center justify-between border-b border-black/[0.04] shrink-0">
+      <header className="px-5 pb-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <MessageSquare className="w-4 h-4 text-black/40" />
           <h2 className="text-[15px] font-bold tracking-tight">Comments</h2>
@@ -176,7 +183,7 @@ export default function CommentSection({
       </header>
 
       {/* Comment list */}
-      <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+      <div ref={listRef} className="flex-1 overflow-y-auto px-5 space-y-3">
         {loading ? (
           <div className="flex items-center justify-center py-10">
             <div className="w-5 h-5 rounded-full border-2 border-black/10 border-t-black animate-spin" />
@@ -246,6 +253,7 @@ export default function CommentSection({
         </div>
       </div>
     </div>
+    </>
   );
 }
 

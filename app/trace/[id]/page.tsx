@@ -75,8 +75,9 @@ export default function TraceWorkspacePage() {
   const [showPostSaveNameModal, setShowPostSaveNameModal] = useState(false);
   const [commentName, setCommentName] = useState<string | null>(null);
   const [isAuthor, setIsAuthor] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
 
-  // Check author status, load visitor name, ensure visitor_id
+  // Check author status, load visitor name, ensure visitor_id, fetch comment count
   useEffect(() => {
     const stored = localStorage.getItem("saved_traces");
     if (stored) {
@@ -92,6 +93,13 @@ export default function TraceWorkspacePage() {
       const newId = `v_${Math.random().toString(36).substring(2, 10)}`;
       localStorage.setItem("visitor_id", newId);
     }
+
+    fetch(`/api/trace/${id}/comments`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success) setCommentCount(res.count);
+      })
+      .catch(() => {});
   }, [id]);
 
   const getDistanceMeters = (coord1: [number, number], coord2: [number, number]) => {
@@ -605,6 +613,7 @@ export default function TraceWorkspacePage() {
             onStartGuidance={startGuidance}
             onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}
+            commentCount={commentCount}
             onCommentsClick={() => {
               const storedName = localStorage.getItem("visitor_name");
               if (storedName) {

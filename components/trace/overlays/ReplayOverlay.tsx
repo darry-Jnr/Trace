@@ -13,6 +13,7 @@ interface ReplayOverlayProps {
   onDismissWaypoint: () => void;
   onBack: () => void;
   onCommentsClick: () => void;
+  commentCount?: number;
 }
 
 function formatDistance(meters: number): string {
@@ -29,6 +30,7 @@ export default function ReplayOverlay({
   onDismissWaypoint,
   onBack,
   onCommentsClick,
+  commentCount = 0,
 }: ReplayOverlayProps) {
   const [showSyncAnimation, setShowSyncAnimation] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
@@ -73,16 +75,24 @@ export default function ReplayOverlay({
         </svg>
       </button>
 
-      {/* Comments button — middle-right (TikTok style) */}
-      <button
-        onClick={onCommentsClick}
-        className="absolute top-1/2 right-5 -translate-y-1/2 z-40 w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
-        title="Comments"
-      >
-        <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </button>
+      {/* Comments button — middle-right (YouTube style) */}
+      <div className="absolute top-1/2 right-5 -translate-y-1/2 z-40 flex flex-col items-center gap-1.5">
+        <button
+          onClick={onCommentsClick}
+          className="w-12 h-12 rounded-2xl bg-white/90 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
+          title="Comments"
+        >
+          <svg className="w-5 h-5 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="14" rx="2" />
+            <path d="M16 10h.01M12 10h.01M8 10h.01" strokeWidth="2" />
+          </svg>
+        </button>
+        {commentCount > 0 && (
+          <span className="text-[11px] font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+            {commentCount}
+          </span>
+        )}
+      </div>
 
       {/* Distance badge — top-right */}
       {guidanceState !== "complete" && distanceToStart !== null && (
