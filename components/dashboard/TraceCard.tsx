@@ -32,6 +32,7 @@ const TraceCard = ({
   isSelected = false,
   onSelectToggle,
   onDelete,
+  onRename,
   onLongPress,
   onShare,
   onClick,
