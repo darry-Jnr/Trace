@@ -37,16 +37,16 @@ export default function ControlDeck({
 }: ControlDeckProps) {
   return (
     <>
-      {/* Map View Toggle — top-right, subtle */}
+      {/* Map View Toggle — top-right */}
       <button
         onClick={onToggleView}
-        className="group absolute top-5 right-5 z-40 w-10 h-10 rounded-full border border-black/[0.06] flex items-center justify-center active:scale-90 transition-all duration-200"
+        className="group absolute top-5 right-5 z-40 w-10 h-10 rounded-xl bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white"
         title={viewMode === "flat" ? "Switch to 3D" : "Switch to 2D"}
       >
         {viewMode === "flat" ? (
-          <Mountain className="w-[18px] h-[18px] text-black/30 group-hover:text-black/60 transition-colors duration-200" />
+          <Mountain className="w-[18px] h-[18px] text-black/50 group-hover:text-black transition-colors duration-200" />
         ) : (
-          <Map className="w-[18px] h-[18px] text-black/30 group-hover:text-black/60 transition-colors duration-200" />
+          <Map className="w-[18px] h-[18px] text-black/50 group-hover:text-black transition-colors duration-200" />
         )}
       </button>
 
@@ -57,11 +57,11 @@ export default function ControlDeck({
         <div className="relative">
           {/* Recording glow ring */}
           {isRecording && (
-            <div className="absolute inset-[-6px] rounded-[28px] bg-red-500/10 animate-ping pointer-events-none" style={{ animationDuration: "1.5s" }} />
+            <div className="absolute inset-[-6px] rounded-xl bg-red-500/10 animate-ping pointer-events-none" style={{ animationDuration: "1.5s" }} />
           )}
           <button
             onClick={onToggleRecord}
-            className={`group relative w-[58px] h-[58px] rounded-[22px] backdrop-blur-2xl border flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200 overflow-hidden ${
+            className={`group relative w-[58px] h-[58px] rounded-xl backdrop-blur-2xl border flex flex-col items-center justify-center active:scale-[0.96] transition-all duration-200 overflow-hidden ${
               isRecording
                 ? "bg-black border-black text-white shadow-[0_0_24px_rgba(255,59,48,0.35)]"
                 : "bg-white/80 border-black/[0.05] text-black shadow-[0_10px_30px_rgba(0,0,0,0.06)]"
@@ -96,7 +96,7 @@ export default function ControlDeck({
         {isRecording && (
           <button
             onClick={onToggleAddMenu}
-            className={`group relative mt-1 w-[52px] h-[52px] rounded-[20px] backdrop-blur-2xl border shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-[0.96] transition-all duration-300 overflow-hidden ${
+            className={`group relative mt-1 w-[52px] h-[52px] rounded-xl backdrop-blur-2xl border shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-[0.96] transition-all duration-300 overflow-hidden ${
               isAddMenuOpen
                 ? "bg-black border-black text-white rotate-45"
                 : "bg-white/80 border-black/[0.05] text-black/65"

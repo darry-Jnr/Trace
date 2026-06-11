@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import type mapboxgl from "mapbox-gl";
-import { ViewMode, WaypointMedia, CACHE_KEY } from "@/types";
+import { ViewMode, WaypointMedia, WaypointGroup, groupWaypoints, CACHE_KEY } from "@/types";
 import { chaikinSmooth } from "./chaikinSmooth";
 
 export function useMapEngine(
   mapRef: React.RefObject<HTMLDivElement | null>,
   baseLocation: [number, number] | null,
-  onWaypointSelect: (waypoint: WaypointMedia) => void,
+  onGroupSelect: (group: WaypointGroup) => void,
   trailCoordinates: [number, number][] = [],
   savedMedia: WaypointMedia[] = [],
   isRecording: boolean = false,
@@ -347,31 +347,53 @@ export function useMapEngine(
     }
   };
 
-  const injectDOMMarker = (waypoint: WaypointMedia) => {
+  const injectDOMMarkerGroup = (group: WaypointGroup) => {
     const map = mapInstanceRef.current;
     if (!map) return null;
 
     const el = document.createElement("div");
-    el.className = "w-8 h-8 rounded-[10px] bg-black text-white border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95 z-30";
-    if (isReplayMode) {
-      el.style.opacity = "0.35";
-      el.style.filter = "grayscale(1)";
+    const count = group.items.length;
+
+    if (count === 1) {
+      // Single item — current marker style
+      el.className = "w-8 h-8 rounded-[10px] bg-black text-white border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95 z-30";
+      if (isReplayMode) {
+        el.style.opacity = "0.35";
+        el.style.filter = "grayscale(1)";
+      }
+      const wp = group.items[0];
+      const icons: Record<string, string> = {
+        text: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
+        image: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
+        voice: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>`
+      };
+      el.innerHTML = icons[wp.type];
+    } else {
+      // Multiple items — show type badges + count
+      const types = [...new Set(group.items.map((i) => i.type))];
+      el.className = "relative w-auto h-auto min-w-[36px] px-[6px] py-[5px] rounded-[10px] bg-black border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center gap-[3px] cursor-pointer transform transition-transform active:scale-95 z-30";
+      if (isReplayMode) {
+        el.style.opacity = "0.35";
+        el.style.filter = "grayscale(1)";
+      }
+      const badgeIcons: Record<string, string> = {
+        text: `<svg class="w-[12px] h-[12px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
+        image: `<svg class="w-[12px] h-[12px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
+        voice: `<svg class="w-[12px] h-[12px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>`
+      };
+      let html = "";
+      types.forEach((t) => { html += badgeIcons[t] || ""; });
+      html += `<span class="text-[9px] font-bold text-white ml-[2px]">${count}</span>`;
+      el.innerHTML = html;
     }
 
-    const icons = {
-      text: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
-      image: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
-      voice: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>`
-    };
-
-    el.innerHTML = icons[waypoint.type];
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      onWaypointSelect(waypoint);
-      map.easeTo({ center: waypoint.coordinates, duration: 600 });
+      onGroupSelect(group);
+      map.easeTo({ center: group.coordinates, duration: 600 });
     });
 
-    const marker = new mapboxglRef.current.Marker({ element: el }).setLngLat(waypoint.coordinates).addTo(map);
+    const marker = new mapboxglRef.current.Marker({ element: el }).setLngLat(group.coordinates).addTo(map);
     return marker;
   };
 
@@ -396,35 +418,49 @@ export function useMapEngine(
     savedMediaRef.current = savedMedia;
   }, [savedMedia]);
 
-  // Sync waypoint DOM markers to Mapbox map dynamically on updates
+  const groupVersionRef = useRef(new Map<string, number>());
+
+  // Sync grouped waypoint markers to Mapbox map
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    const applyWaypoints = () => {
-      const currentIds = new Set(savedMediaRef.current.map((wp) => wp.id));
+    const applyWaypointGroups = () => {
+      const groups = groupWaypoints(savedMediaRef.current);
+      const groupIds = new Set(groups.map((g) => g.id));
 
       injectedMarkersRef.current.forEach((marker, id) => {
-        if (!currentIds.has(id)) {
+        if (!groupIds.has(id)) {
           marker.remove();
           injectedMarkersRef.current.delete(id);
+          groupVersionRef.current.delete(id);
         }
       });
 
-      savedMediaRef.current.forEach((waypoint) => {
-        if (!injectedMarkersRef.current.has(waypoint.id)) {
-          const marker = injectDOMMarker(waypoint);
+      groups.forEach((group) => {
+        const version = group.items.length;
+        if (groupVersionRef.current.get(group.id) !== version) {
+          const existing = injectedMarkersRef.current.get(group.id);
+          if (existing) existing.remove();
+          injectedMarkersRef.current.delete(group.id);
+          groupVersionRef.current.set(group.id, version);
+        }
+      });
+
+      groups.forEach((group) => {
+        if (!injectedMarkersRef.current.has(group.id)) {
+          const marker = injectDOMMarkerGroup(group);
           if (marker) {
-            injectedMarkersRef.current.set(waypoint.id, marker);
+            injectedMarkersRef.current.set(group.id, marker);
           }
         }
       });
     };
 
     if (map.isStyleLoaded()) {
-      applyWaypoints();
+      applyWaypointGroups();
     } else {
-      map.once("style.load", applyWaypoints);
+      map.once("style.load", applyWaypointGroups);
     }
   }, [savedMedia]);
 
@@ -434,5 +470,17 @@ export function useMapEngine(
     map.easeTo({ center: coords, zoom: 17, duration: 700 });
   };
 
-  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, injectDOMMarker, centerOnCoords, mapError };
+  const zoomIn = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.zoomIn({ duration: 300 });
+  };
+
+  const zoomOut = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.zoomOut({ duration: 300 });
+  };
+
+  return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, centerOnCoords, zoomIn, zoomOut, mapError };
 }

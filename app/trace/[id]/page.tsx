@@ -9,6 +9,7 @@ import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
 import { useMapEngine } from "@/hooks/trace/useMapEngine";
 import { useReplayGuidance } from "@/hooks/trace/useReplayGuidance";
 import { WaypointMedia } from "@/types";
+import type { WaypointGroup } from "@/types";
 
 import MapCanvas from "@/components/trace/MapCanvas";
 import ControlDeck from "@/components/trace/ControlDeck";
@@ -47,6 +48,8 @@ export default function TraceWorkspacePage() {
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [savedMedia, setSavedMedia] = useState<WaypointMedia[]>([]);
   const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
+  const [activeGroupItems, setActiveGroupItems] = useState<WaypointMedia[]>([]);
+  const [activeGroupIndex, setActiveGroupIndex] = useState(0);
   const [showSaveReview, setShowSaveReview] = useState(false);
   const [traceTitleInput, setTraceTitleInput] = useState("Unfinished Trail Trace");
   const [trailCoordinates, setTrailCoordinates] = useState<[number, number][]>([]);
@@ -295,6 +298,7 @@ export default function TraceWorkspacePage() {
   const handleDismissWaypoint = useCallback(() => {
     dismissWaypoint();
     setActiveWaypoint(null);
+    setActiveGroupItems([]);
   }, [dismissWaypoint]);
 
   // Engine Connection #1: Mapbox canvas lifecycle engine
@@ -304,11 +308,17 @@ export default function TraceWorkspacePage() {
     handleLocationStream,
     updateVectorPath,
     centerOnCoords,
+    zoomIn,
+    zoomOut,
     mapError
   } = useMapEngine(
     mapRef,
     isReplayMode ? replayBaseLocation : baseLocation,
-    setActiveWaypoint,
+    (group: WaypointGroup) => {
+      setActiveGroupItems(group.items);
+      setActiveGroupIndex(0);
+      setActiveWaypoint(group.items[0]);
+    },
     trailCoordinates,
     savedMedia,
     isRecording,
@@ -333,7 +343,7 @@ export default function TraceWorkspacePage() {
       id: `wp-${Date.now()}`,
       type: "text",
       content: text,
-      category: "HELPING GUESTS FIND YOUR HOUSE",
+      category: "Note",
       coordinates: targetCoords,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
@@ -345,12 +355,14 @@ export default function TraceWorkspacePage() {
     const targetCoords = getCurrentCapturePoint();
     const wpId = `wp-${Date.now()}`;
     pendingMediaRef.current.set(wpId, audioBlob);
+    const blobUrl = URL.createObjectURL(audioBlob);
     const newMedia: WaypointMedia = {
       id: wpId,
       type: "voice",
-      content: `Voice Memo (${durationSec}s)`,
-      category: "FINDING FRIENDS IN A CROWD",
+      content: "",
+      category: "Voice Note",
       coordinates: targetCoords,
+      fileUrl: blobUrl,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
@@ -364,9 +376,10 @@ export default function TraceWorkspacePage() {
     const newMedia: WaypointMedia = {
       id: wpId,
       type: "image",
-      content: imageDataUrl,
-      category: "RUNNING WITH FRIENDS",
+      content: "",
+      category: "Photo",
       coordinates: targetCoords,
+      fileUrl: imageDataUrl,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
@@ -548,7 +561,15 @@ export default function TraceWorkspacePage() {
 
         {/* SIDE DRAWER MARKER NODE SHEETS — only in recording mode */}
         {!isReplayMode && (
-          <WaypointSheet activeWaypoint={activeWaypoint} onClose={() => setActiveWaypoint(null)} />
+          <WaypointSheet
+            activeWaypoint={activeGroupItems[activeGroupIndex] || null}
+            groupItems={activeGroupItems}
+            groupIndex={activeGroupIndex}
+            itemCount={activeGroupItems.length}
+            onPrev={() => setActiveGroupIndex((i) => Math.max(0, i - 1))}
+            onNext={() => setActiveGroupIndex((i) => Math.min(activeGroupItems.length - 1, i + 1))}
+            onClose={() => { setActiveWaypoint(null); setActiveGroupItems([]); }}
+          />
         )}
 
         {/* REPLAY OVERLAYS: distance badge, sync, guidance, completion */}
@@ -617,26 +638,15 @@ export default function TraceWorkspacePage() {
           <>
             {/* Top-left button group */}
             {!isRecording && (
-              <div className="absolute top-5 left-5 z-40 flex items-center gap-2">
+              <div className="absolute top-5 left-5 z-40">
                 <button
                   onClick={() => router.push("/dashboard")}
-                  className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
+                  className="w-10 h-10 rounded-xl bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
                   title="Back to dashboard"
                 >
                   <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M19 12H5" />
                     <path d="M12 19l-7-7 7-7" />
-                  </svg>
-                </button>
-
-                <button
-                  onClick={() => userLocation && centerOnCoords(userLocation)}
-                  className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_10px_30px_rgba(0,0,0,0.06)] flex items-center justify-center active:scale-90 transition-all duration-200 hover:bg-white group"
-                  title="Re-center on my location"
-                >
-                  <svg className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
                   </svg>
                 </button>
               </div>
@@ -656,6 +666,37 @@ export default function TraceWorkspacePage() {
 
             <LocationStatus hasGpsFix={hasGpsFix} gpsTimedOut={gpsTimedOut} onRetry={retryGps} />
             <RecordingTimer isRecording={isRecording} />
+
+            {/* Bottom-right: zoom + re-center */}
+            <div className="hidden md:flex absolute bottom-5 right-5 z-40 flex-col items-center gap-2">
+              <button
+                onClick={() => userLocation && centerOnCoords(userLocation)}
+                className="w-9 h-9 rounded-xl bg-white/70 backdrop-blur-xl border border-black/[0.04] flex items-center justify-center active:scale-90 transition-all hover:bg-white/90"
+                title="Re-center on location"
+              >
+                <svg className="w-[15px] h-[15px] text-black/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                </svg>
+              </button>
+              <div className="bg-white/70 backdrop-blur-xl border border-black/[0.04] rounded-xl overflow-hidden">
+                <button
+                  onClick={() => zoomIn?.()}
+                  className="w-9 h-9 flex items-center justify-center active:scale-90 transition-all hover:bg-white/90"
+                  title="Zoom in"
+                >
+                  <span className="text-[16px] font-semibold text-black/40 leading-none">+</span>
+                </button>
+                <div className="h-[1px] bg-black/[0.06] mx-2" />
+                <button
+                  onClick={() => zoomOut?.()}
+                  className="w-9 h-9 flex items-center justify-center active:scale-90 transition-all hover:bg-white/90"
+                  title="Zoom out"
+                >
+                  <span className="text-[16px] font-semibold text-black/40 leading-none">−</span>
+                </button>
+              </div>
+            </div>
 
             {/* Onboarding hint — points at the Start button */}
             {showStartHint && !isRecording && (
