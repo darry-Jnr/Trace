@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WaypointMedia } from "@/types";
-import { MapPin, Volume2, Camera, FileText, CheckCircle } from "lucide-react";
+import { MapPin, Volume2, Camera, FileText, CheckCircle, X, RotateCcw } from "lucide-react";
 
 interface ReplayOverlayProps {
   guidanceState: "idle" | "synced" | "following" | "complete";
@@ -12,6 +12,7 @@ interface ReplayOverlayProps {
   onDismissWaypoint: () => void;
   onBack: () => void;
   onCommentsClick: () => void;
+  onRetrace: () => void;
   commentCount?: number;
 }
 
@@ -28,15 +29,26 @@ export default function ReplayOverlay({
   onDismissWaypoint,
   onBack,
   onCommentsClick,
+  onRetrace,
   commentCount = 0,
 }: ReplayOverlayProps) {
   const [showCompletion, setShowCompletion] = useState(false);
+  const [completionDismissed, setCompletionDismissed] = useState(false);
+  const [showRetracePrompt, setShowRetracePrompt] = useState(false);
+  const retraceShownRef = useRef(false);
 
   useEffect(() => {
     if (guidanceState === "complete") {
       setShowCompletion(true);
     }
   }, [guidanceState]);
+
+  useEffect(() => {
+    if (completionDismissed && distanceToStart !== null && distanceToStart < 20 && !retraceShownRef.current) {
+      setShowRetracePrompt(true);
+      retraceShownRef.current = true;
+    }
+  }, [completionDismissed, distanceToStart]);
 
   const iconMap = {
     text: FileText,
@@ -146,27 +158,55 @@ export default function ReplayOverlay({
         </div>
       )}
 
-      {/* Completion overlay */}
+      {/* Completion card — small bottom sheet with X dismiss */}
       {showCompletion && (
-        <div className="absolute inset-0 z-50 flex flex-col bg-white animate-fade-in">
-          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16">
-            <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mb-6 shadow-lg">
-              <CheckCircle className="w-10 h-10 text-white" />
-            </div>
-            <h2 className="text-[28px] font-bold tracking-tight text-black text-center">
-              You made it!
-            </h2>
-            <p className="mt-2 text-[15px] text-black/50 font-medium text-center leading-relaxed max-w-[280px]">
-              You&apos;ve successfully followed the entire route.
-            </p>
-          </div>
-          <div className="px-6 pb-10">
+        <div className="absolute bottom-0 left-0 right-0 z-50 animate-slide-up-sheet">
+          <div className="mx-4 mb-6 p-5 rounded-[24px] bg-white/95 backdrop-blur-2xl border border-black/[0.04] shadow-[0_10px_40px_rgba(0,0,0,0.1)]">
             <button
-              onClick={onBack}
-              className="w-full h-14 rounded-2xl bg-black text-white text-[15px] font-semibold tracking-tight active:scale-[0.98] transition-transform"
+              onClick={() => { setShowCompletion(false); setCompletionDismissed(true); }}
+              className="absolute top-4 right-4 w-7 h-7 rounded-full bg-black/5 flex items-center justify-center active:scale-90 transition-transform"
             >
-              Back to dashboard
+              <X className="w-3.5 h-3.5 text-black/40" />
             </button>
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-[15px] font-bold text-black tracking-tight">You made it!</p>
+                <p className="text-[13px] text-black/50 font-medium">Route complete — {trailProgress}% trail followed</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Retrace prompt — shows when user nears start after completion */}
+      {showRetracePrompt && (
+        <div className="absolute bottom-0 left-0 right-0 z-50 animate-slide-up-sheet">
+          <div className="mx-4 mb-6 p-5 rounded-[24px] bg-white/95 backdrop-blur-2xl border border-black/[0.04] shadow-[0_10px_40px_rgba(0,0,0,0.1)]">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center shrink-0">
+                <RotateCcw className="w-5 h-5 text-black/60" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[14px] font-semibold text-black tracking-tight">Close to start — retrace?</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <button
+                onClick={() => setShowRetracePrompt(false)}
+                className="flex-1 h-10 rounded-xl bg-black/[0.05] text-[13px] font-semibold text-black/60 active:scale-95 transition-transform"
+              >
+                Not now
+              </button>
+              <button
+                onClick={() => { setShowRetracePrompt(false); setCompletionDismissed(false); retraceShownRef.current = false; onRetrace(); }}
+                className="flex-1 h-10 rounded-xl bg-black text-white text-[13px] font-semibold active:scale-95 transition-transform"
+              >
+                Yes, start over
+              </button>
+            </div>
           </div>
         </div>
       )}

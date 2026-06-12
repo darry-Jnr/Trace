@@ -673,6 +673,7 @@ export default function TraceWorkspacePage() {
             onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}
             commentCount={commentCount}
+            onRetrace={() => resetGuidance()}
             onCommentsClick={() => {
               const storedName = localStorage.getItem("visitor_name");
               if (storedName) {
