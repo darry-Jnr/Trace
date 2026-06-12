@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useToast } from "@/components/ui/Toast";
 
 import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
+import { snapToRoads } from "@/utils/snapToRoads";
 import { useMapEngine } from "@/hooks/trace/useMapEngine";
 import { useReplayGuidance } from "@/hooks/trace/useReplayGuidance";
 import { WaypointMedia } from "@/types";
@@ -52,6 +53,8 @@ export default function TraceWorkspacePage() {
   const [activeGroupItems, setActiveGroupItems] = useState<WaypointMedia[]>([]);
   const [activeGroupIndex, setActiveGroupIndex] = useState(0);
   const [showSaveReview, setShowSaveReview] = useState(false);
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [showPolishedMap, setShowPolishedMap] = useState(false);
   const [traceTitleInput, setTraceTitleInput] = useState("Unfinished Trail Trace");
   const [trailCoordinates, setTrailCoordinates] = useState<[number, number][]>([]);
   const [isReplayMode, setIsReplayMode] = useState(false);
@@ -462,7 +465,18 @@ export default function TraceWorkspacePage() {
       setTraceTitleInput(getNextUntitledTitle());
       setTrailCoordinates(trailCoordsRef.current);
       updateVectorPath(trailCoordsRef.current);
-      setShowSaveReview(true);
+
+      setIsPolishing(true);
+      snapToRoads(trailCoordsRef.current).then((snapped) => {
+        setTrailCoordinates(snapped);
+        updateVectorPath(snapped);
+        setIsPolishing(false);
+        setShowPolishedMap(true);
+        setTimeout(() => {
+          setShowPolishedMap(false);
+          setShowSaveReview(true);
+        }, 800);
+      });
     } else {
       setIsRecording(true);
       setIsAddMenuOpen(false);
@@ -712,7 +726,7 @@ export default function TraceWorkspacePage() {
         />
 
         {/* INPUT HARDWARE CONTROL DECK CORE PANEL */}
-        {!showInitialLoader && !isReplayMode && !showSaveReview && (
+        {!showInitialLoader && !isReplayMode && !showSaveReview && !isPolishing && !showPolishedMap && (
           <>
             {/* Top-left button group */}
             {!isRecording && (
@@ -823,6 +837,16 @@ export default function TraceWorkspacePage() {
           />
         </div>
       )}
+
+      {/* POLISHING ROUTE OVERLAY — full opaque cover, fades out softly */}
+      <div
+        className={`absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#f5f5f7] transition-opacity duration-500 ${
+          isPolishing ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="w-8 h-8 border-2 border-black/20 border-t-black rounded-full animate-spin mb-4" />
+        <p className="text-sm font-medium text-black/60">Polishing your route...</p>
+      </div>
 
       {/* BLOCKING HARDWARE LOADING TIMELINE MASK */}
       <InitialLoader isLoading={showInitialLoader} loadingMessage={loadingMessageStr} onRetry={gpsTimedOut ? handleRetryGps : undefined} />
