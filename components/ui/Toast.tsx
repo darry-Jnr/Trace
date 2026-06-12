@@ -10,14 +10,15 @@ export interface Toast {
   message?: string;
   type: ToastType;
   duration?: number;
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastContextType {
   toast: {
-    success: (title: string, message?: string, duration?: number) => void;
-    error: (title: string, message?: string, duration?: number) => void;
-    warning: (title: string, message?: string, duration?: number) => void;
-    info: (title: string, message?: string, duration?: number) => void;
+    success: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => void;
+    error: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => void;
+    warning: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => void;
+    info: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => void;
   };
   removeToast: (id: string) => void;
   toasts: Toast[];
@@ -40,17 +41,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const addToast = useCallback((type: ToastType, title: string, message?: string, duration = 4000) => {
+  const addToast = useCallback((type: ToastType, title: string, message?: string, duration = 4000, action?: { label: string; onClick: () => void }) => {
     const id = Math.random().toString(36).substring(2, 9);
-    // Stack newest notifications on top by appending to the front
-    setToasts((prev) => [{ id, title, message, type, duration }, ...prev]);
+    setToasts((prev) => [{ id, title, message, type, duration, action }, ...prev]);
   }, []);
 
   const toast = {
-    success: (title: string, message?: string, duration?: number) => addToast("success", title, message, duration),
-    error: (title: string, message?: string, duration?: number) => addToast("error", title, message, duration),
-    warning: (title: string, message?: string, duration?: number) => addToast("warning", title, message, duration),
-    info: (title: string, message?: string, duration?: number) => addToast("info", title, message, duration),
+    success: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => addToast("success", title, message, duration, action),
+    error: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => addToast("error", title, message, duration, action),
+    warning: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => addToast("warning", title, message, duration, action),
+    info: (title: string, message?: string, duration?: number, action?: { label: string; onClick: () => void }) => addToast("info", title, message, duration, action),
   };
 
   return (
@@ -164,6 +164,14 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
           <p className="text-[12px] font-medium text-black/45 leading-normal mt-0.5 tracking-tight">
             {toast.message}
           </p>
+        )}
+        {toast.action && (
+          <button
+            onClick={() => { toast.action!.onClick(); onClose(); }}
+            className="mt-1.5 text-[12px] font-semibold text-black hover:text-black/60 transition-colors underline underline-offset-2"
+          >
+            {toast.action.label}
+          </button>
         )}
       </div>
 

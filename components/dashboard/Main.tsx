@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Plus, Trash2, Filter, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import TraceCard from "./TraceCard";
 
@@ -29,6 +28,7 @@ const Main = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const pendingDeletionsRef = useRef<Map<string, { trace: TraceItem; timer: ReturnType<typeof setTimeout> }>>(new Map());
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -177,38 +177,66 @@ const Main = () => {
     setSelectedIds([]);
   };
 
-  const handleDeleteTraces = async (idsToDelete: string[]) => {
+  const handleDeleteTraces = (idsToDelete: string[]) => {
     if (idsToDelete.length === 0) return;
 
-    const confirmText = idsToDelete.length === 1
-      ? "Are you sure you want to delete this trace? It will be removed from local storage and the database."
-      : `Are you sure you want to delete these ${idsToDelete.length} traces? They will be removed from local storage and the database.`;
+    // Save traces for potential undo
+    const tracesToDelete = myTraces.filter((t) => idsToDelete.includes(t.id));
 
-    if (!confirm(confirmText)) return;
-
+    // Optimistic removal
     setMyTraces((prev) => prev.filter((t) => !idsToDelete.includes(t.id)));
 
-    try {
-      const stored = localStorage.getItem("saved_traces");
-      if (stored) {
-        const localTraces = JSON.parse(stored);
-        const updated = localTraces.filter((t: { id: string }) => !idsToDelete.includes(t.id));
-        localStorage.setItem("saved_traces", JSON.stringify(updated));
-      }
-    } catch (e) {
-      console.error("LocalStorage delete error:", e);
-    }
+    const label = idsToDelete.length === 1 ? "Trace deleted" : `${idsToDelete.length} traces deleted`;
 
-    try {
-      await Promise.all(
-        idsToDelete.map((id) =>
-          fetch(`/api/trace/${id}`, { method: "DELETE" })
-        )
-      );
-      toast.success("Traces Deleted", "The selected trace records have been deleted successfully.");
-    } catch (err) {
-      console.error("Supabase deletion error:", err);
-      toast.error("Database Delete Failed", "Trace could not be deleted from the server database.");
+    toast.success(
+      label,
+      undefined,
+      5000,
+      {
+        label: "Undo",
+        onClick: () => {
+          // Cancel pending deletions and restore
+          for (const id of idsToDelete) {
+            const pending = pendingDeletionsRef.current.get(id);
+            if (pending) {
+              clearTimeout(pending.timer);
+              pendingDeletionsRef.current.delete(id);
+            }
+          }
+          setMyTraces((prev) => {
+            const restored = tracesToDelete.filter((t) => !prev.some((p) => p.id === t.id));
+            return [...prev, ...restored].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          });
+        },
+      }
+    );
+
+    // Schedule actual deletion after 5s
+    for (const trace of tracesToDelete) {
+      const timer = setTimeout(async () => {
+        pendingDeletionsRef.current.delete(trace.id);
+
+        // Remove from localStorage
+        try {
+          const stored = localStorage.getItem("saved_traces");
+          if (stored) {
+            const localTraces = JSON.parse(stored);
+            const updated = localTraces.filter((t: { id: string }) => t.id !== trace.id);
+            localStorage.setItem("saved_traces", JSON.stringify(updated));
+          }
+        } catch (e) {
+          console.error("LocalStorage delete error:", e);
+        }
+
+        // Delete from Supabase
+        try {
+          await fetch(`/api/trace/${trace.id}`, { method: "DELETE" });
+        } catch (err) {
+          console.error("Supabase deletion error:", err);
+        }
+      }, 5000);
+
+      pendingDeletionsRef.current.set(trace.id, { trace, timer });
     }
 
     cancelSelection();
@@ -218,11 +246,11 @@ const Main = () => {
 
   return (
     <main className="min-h-screen bg-[#f3f3f1] text-black pb-24 font-sans">
-      <div className="max-w-4xl mx-auto px-6 pt-8">
+      <div className="max-w-4xl mx-auto px-6 pt-6 sm:pt-8">
 
         {/* Header Action Row */}
         {isSelectMode ? (
-          <div className="flex items-center justify-between mb-14 bg-white/70 backdrop-blur-2xl border border-black/[0.05] px-6 py-4 rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.03)] animate-fade-in select-none">
+          <div className="flex items-center justify-between mb-6 bg-white/70 backdrop-blur-2xl border border-black/[0.05] px-6 py-4 rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.03)] animate-fade-in select-none">
             <div className="flex items-center gap-3">
               <span className="text-[15px] font-bold text-black tracking-tight">
                 {selectedIds.length} selected
@@ -244,75 +272,56 @@ const Main = () => {
               </button>
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">
-            <div>
-              <h1 className="text-[2.5rem] leading-none tracking-[-0.06em] font-bold">
-                Trace
-              </h1>
-              <p className="mt-3 text-[15px] text-black/45 max-w-sm leading-relaxed font-medium tracking-tight">
-                Walk routes once and share them with anyone.
-              </p>
+        ) : null}
+
+        {/* Filter + Actions Row */}
+        {!isSelectMode && (
+          <div className="flex items-center justify-between mb-6 select-none">
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setFilterOpen(!filterOpen)}
+                className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-black/15 bg-transparent text-[13px] font-medium tracking-tight text-black/60 hover:text-black/80 hover:border-black/30 active:scale-95 transition-all cursor-pointer"
+              >
+                <span className="capitalize">{filter}</span>
+                <ChevronDown className="w-3 h-3 text-black/30" />
+              </button>
+
+              {filterOpen && (
+                <div className="absolute left-0 top-full mt-1 w-28 bg-white rounded-xl border border-black/[0.05] shadow-[0_10px_40px_rgba(0,0,0,0.12)] py-1.5 z-50 animate-fade-in">
+                  {(["all", "mine", "shared"] as FilterTab[]).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => { setFilter(tab); setFilterOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium transition-colors ${
+                        filter === tab
+                          ? "text-black bg-black/[0.03]"
+                          : "text-black/50 hover:text-black/70 hover:bg-black/[0.03]"
+                      }`}
+                    >
+                      <span className="capitalize">{tab}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
+            <div className="flex items-center gap-3">
+              {isLoaded && (
+                <p className="text-[12px] text-black/25 font-medium">{countLabel}</p>
+              )}
+              <button
                 onClick={handleNewTrace}
-                className="rounded-[16px] px-6 h-12 flex items-center gap-2 shadow-none hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center hover:scale-[1.04] active:scale-95 transition-all cursor-pointer shadow-sm"
+                title="New Trace"
               >
-                <Plus className="w-4 h-4 shrink-0" />
-                <span className="font-semibold leading-none">
-                  New Trace
-                </span>
-              </Button>
+                <Plus className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
 
         {/* Trace List */}
         <section>
-          {!isSelectMode && isLoaded && (
-            <div className="flex items-center justify-between mb-5 select-none">
-              <h2 className="text-[1.15rem] font-bold tracking-tight">
-                {filter === "all" ? "All Traces" : filter === "mine" ? "My Traces" : "Shared Traces"}
-              </h2>
-              <p className="text-sm text-black/25 font-semibold">{countLabel}</p>
-            </div>
-          )}
-
-          {!isSelectMode && (
-            <div className="flex justify-end mb-5 select-none" ref={filterRef}>
-              <div className="relative">
-                <button
-                  onClick={() => setFilterOpen(!filterOpen)}
-                  className="flex items-center gap-1.5 px-3.5 h-8 rounded-full border border-black/15 bg-transparent text-[12px] font-semibold tracking-tight text-black/60 hover:text-black/80 hover:border-black/30 active:scale-95 transition-all cursor-pointer"
-                >
-                  <Filter className="w-3 h-3" />
-                  <span className="capitalize">{filter}</span>
-                  <ChevronDown className="w-3 h-3 text-black/30" />
-                </button>
-
-                {filterOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-32 bg-white rounded-2xl border border-black/[0.05] shadow-[0_10px_40px_rgba(0,0,0,0.12)] py-2 z-50 animate-fade-in">
-                    {(["all", "mine", "shared"] as FilterTab[]).map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => { setFilter(tab); setFilterOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium transition-colors ${
-                          filter === tab
-                            ? "text-black bg-black/[0.03]"
-                            : "text-black/50 hover:text-black/70 hover:bg-black/[0.03]"
-                        }`}
-                      >
-                        <span className="capitalize">{tab}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="space-y-4">
             {isLoaded ? (
               filteredTraces.length > 0 ? (
@@ -341,19 +350,42 @@ const Main = () => {
                   );
                 })
               ) : (
-                <div className="p-8 rounded-[24px] border border-dashed border-black/10 bg-white/50 text-center select-none">
-                  {filter === "mine" ? (
-                    <p className="text-sm text-black/40 font-medium">
-                      No saved traces yet. Click &quot;New Trace&quot; above to start recording.
-                    </p>
-                  ) : filter === "shared" ? (
-                    <p className="text-sm text-black/40 font-medium">
-                      No recently viewed traces. Open a shared link to see it here.
-                    </p>
+                <div className="flex flex-col items-center justify-center py-20 px-6 text-center select-none">
+                  {filter === "shared" ? (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-black/[0.04] flex items-center justify-center mb-4">
+                        <svg className="w-5 h-5 text-black/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-black/40 font-medium">
+                        No recently viewed traces. Open a shared link to see it here.
+                      </p>
+                    </>
                   ) : (
-                    <p className="text-sm text-black/40 font-medium">
-                      No traces yet. Click &quot;New Trace&quot; above to start recording.
-                    </p>
+                    <>
+                      <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mb-5">
+                        <svg className="w-6 h-6 text-black/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                      </div>
+                      <p className="text-[15px] text-black/40 font-medium leading-relaxed max-w-[260px]">
+                        {filter === "mine" ? "Start your first trace" : "No traces yet"}
+                      </p>
+                      <p className="mt-1 text-[13px] text-black/30 font-medium max-w-[260px]">
+                        Walk a route, drop moments along the way, and share it with anyone.
+                      </p>
+                      <button
+                        onClick={handleNewTrace}
+                        className="mt-7 h-11 px-6 rounded-xl bg-black text-white text-[13px] font-semibold flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        New Trace
+                      </button>
+                    </>
                   )}
                 </div>
               )

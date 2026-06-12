@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { CornerUpRight, Copy, Trash2, MoreVertical, Route, Clock, X, AlertTriangle, Pencil, User } from "lucide-react";
+import { CornerUpRight, Copy, Trash2, MoreVertical, Route, X, Pencil, User } from "lucide-react";
 
 interface TraceCardProps {
   title: string;
@@ -38,11 +38,10 @@ const TraceCard = ({
 }: TraceCardProps) => {
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [showDetail, setShowDetail] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showRename, setShowRename] = useState(false);
-  const [renameValue, setRenameValue] = useState(title);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(title);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -128,9 +127,50 @@ const TraceCard = ({
 
           <div className="min-w-0 text-left flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="text-[15px] font-semibold text-black tracking-tight leading-snug truncate">
-                {title}
-              </h3>
+              {isEditing ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && editValue.trim()) {
+                      setIsEditing(false);
+                      onRename?.(editValue.trim());
+                    }
+                    if (e.key === "Escape") {
+                      setIsEditing(false);
+                      setEditValue(title);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (editValue.trim() && editValue.trim() !== title) {
+                      onRename?.(editValue.trim());
+                    } else {
+                      setEditValue(title);
+                    }
+                    setIsEditing(false);
+                  }}
+                  className="text-[15px] font-semibold text-black tracking-tight leading-snug bg-transparent border-b border-black/20 outline-none py-0.5 min-w-[120px]"
+                  autoFocus
+                  maxLength={40}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <h3
+                  className="text-[15px] font-semibold text-black tracking-tight leading-snug truncate"
+                  onClick={(e) => {
+                    if (!isSelectMode && isOwner) {
+                      e.stopPropagation();
+                      setEditValue(title);
+                      setIsEditing(true);
+                      setTimeout(() => inputRef.current?.focus(), 0);
+                    }
+                  }}
+                >
+                  {title}
+                </h3>
+              )}
               <span title={isOwner ? "Owner" : "Shared"}><User className="w-3.5 h-3.5 text-black/25 shrink-0" /></span>
             </div>
 
@@ -185,31 +225,21 @@ const TraceCard = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowMenu(false);
-                      setRenameValue(title);
-                      setShowRename(true);
+                      setEditValue(title);
+                      setIsEditing(true);
+                      setTimeout(() => inputRef.current?.focus(), 0);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-black/70 hover:bg-black/[0.03] active:bg-black/[0.06] transition-colors"
                   >
                     <Pencil className="w-4 h-4" />
                     Rename
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      setShowDetail(true);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-black/70 hover:bg-black/[0.03] active:bg-black/[0.06] transition-colors"
-                  >
-                    <Clock className="w-4 h-4" />
-                    Details
-                  </button>
                   <div className="mx-3 my-1.5 h-px bg-black/[0.06]" />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowMenu(false);
-                      setShowDeleteConfirm(true);
+                      onDelete?.();
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 active:bg-red-100 transition-colors"
                   >
@@ -223,155 +253,6 @@ const TraceCard = ({
         </div>
       </div>
 
-      {/* Detail modal — centered */}
-      {showDetail && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={() => setShowDetail(false)}>
-          <div className="absolute inset-0 bg-black/20 animate-fade-in" />
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative bg-white w-[340px] sm:w-[360px] rounded-[28px] p-6 animate-scale-up-modal shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
-          >
-            <button
-              onClick={() => setShowDetail(false)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/5 flex items-center justify-center active:scale-90 transition-transform"
-            >
-              <X className="w-3.5 h-3.5 text-black/50" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-[20px] font-bold tracking-tight text-black pr-8">
-                {title}
-              </h3>
-              <span title={isOwner ? "Owner" : "Shared"}><User className="w-4 h-4 text-black/25 shrink-0" /></span>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#f5f5f7]">
-                <Clock className="w-4 h-4 text-black/40 shrink-0" />
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40">Created</p>
-                  <p className="text-[14px] font-medium text-black/80 mt-0.5">{date}</p>
-                </div>
-              </div>
-
-              {distance && (
-                <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#f5f5f7]">
-                  <Route className="w-4 h-4 text-black/40 shrink-0" />
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40">Distance</p>
-                    <p className="text-[14px] font-medium text-black/80 mt-0.5">{distance}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#f5f5f7]">
-                <CornerUpRight className="w-4 h-4 text-black/40 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40">Link</p>
-                  <p className="text-[14px] font-medium text-black/80 mt-0.5 truncate">{link}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rename modal — centered */}
-      {showRename && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={() => setShowRename(false)}>
-          <div className="absolute inset-0 bg-black/20 animate-fade-in" />
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative bg-white w-[340px] rounded-[28px] p-6 animate-scale-up-modal shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-[20px] font-bold tracking-tight text-black">
-                Rename trace
-              </h3>
-              <button
-                onClick={() => setShowRename(false)}
-                className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center active:scale-90 transition-transform shrink-0"
-              >
-                <X className="w-3.5 h-3.5 text-black/50" />
-              </button>
-            </div>
-            <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              placeholder="Trace name"
-              maxLength={40}
-              autoFocus
-              className="w-full h-12 px-4 rounded-2xl bg-[#f5f5f7] border border-transparent focus:border-black/10 focus:bg-white outline-none transition text-[15px] font-medium tracking-tight placeholder:text-black/25"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && renameValue.trim()) {
-                  setShowRename(false);
-                  onRename?.(renameValue.trim());
-                }
-              }}
-            />
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => setShowRename(false)}
-                className="flex-1 h-11 rounded-2xl bg-[#f5f5f7] text-[13px] font-semibold text-black/50 active:scale-[0.98] transition-transform"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (renameValue.trim()) {
-                    setShowRename(false);
-                    onRename?.(renameValue.trim());
-                  }
-                }}
-                className="flex-1 h-11 rounded-2xl bg-black text-white text-[13px] font-semibold active:scale-[0.98] transition-transform"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation modal — centered */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="absolute inset-0 bg-black/20 animate-fade-in" />
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative bg-white w-[320px] rounded-[28px] p-6 animate-scale-up-modal shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
-                <AlertTriangle className="w-6 h-6 text-red-500" />
-              </div>
-              <h3 className="text-[18px] font-bold tracking-tight text-black">
-                Delete trace?
-              </h3>
-              <p className="mt-2 text-[13px] text-black/50 font-medium leading-relaxed">
-                This will permanently remove this trace from your dashboard and the server.
-              </p>
-              <div className="mt-6 w-full flex gap-2">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 h-11 rounded-2xl bg-[#f5f5f7] text-[13px] font-semibold text-black/60 active:scale-[0.98] transition-transform"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    onDelete?.();
-                  }}
-                  className="flex-1 h-11 rounded-2xl bg-red-500 text-white text-[13px] font-semibold active:scale-[0.98] transition-transform"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
