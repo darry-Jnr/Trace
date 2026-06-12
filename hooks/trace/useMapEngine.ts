@@ -436,7 +436,7 @@ export function useMapEngine(
   // Sync vector path trail to Mapbox source layer automatically on updates
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || isReplayMode) return;
+    if (!map) return;
 
     const applyPath = () => {
       updateVectorPath(trailCoordinates);
