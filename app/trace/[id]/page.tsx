@@ -239,6 +239,26 @@ export default function TraceWorkspacePage() {
             }
             setShowSaveReview(false);
             (window as any).pendo?.track('Trace Opened', { traceId: id, source: 'shared_link' });
+
+            // Save to recently_viewed for dashboard
+            try {
+              const recentRaw = localStorage.getItem("recently_viewed");
+              const recent = recentRaw ? JSON.parse(recentRaw) : [];
+              const entry = {
+                id: fetchedTrace.id,
+                title: fetchedTrace.title,
+                date: fetchedTrace.date,
+                distance: fetchedTrace.distance,
+              };
+              // Dedupe by id, then prepend
+              const deduped = recent.filter((r: any) => r.id !== entry.id);
+              deduped.unshift(entry);
+              // Cap at 10
+              localStorage.setItem("recently_viewed", JSON.stringify(deduped.slice(0, 10)));
+            } catch (e) {
+              console.error("Failed to save to recently_viewed:", e);
+            }
+
             return;
           }
         }

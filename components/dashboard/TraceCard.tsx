@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { CornerUpRight, Copy, Trash2, MoreVertical, Route, Clock, X, AlertTriangle, Pencil } from "lucide-react";
+import { CornerUpRight, Copy, Trash2, MoreVertical, Route, Clock, X, AlertTriangle, Pencil, User } from "lucide-react";
 
 interface TraceCardProps {
   title: string;
@@ -9,7 +9,7 @@ interface TraceCardProps {
   date: string;
   distance?: string;
 
-  isRecent?: boolean;
+  isOwner?: boolean;
   isSelectMode?: boolean;
   isSelected?: boolean;
   onSelectToggle?: () => void;
@@ -26,7 +26,7 @@ const TraceCard = ({
   link,
   date,
   distance,
-  isRecent = false,
+  isOwner = false,
   isSelectMode = false,
   isSelected = false,
   onSelectToggle,
@@ -57,7 +57,7 @@ const TraceCard = ({
   }, [showMenu]);
 
   const handleTouchStart = () => {
-    if (isRecent || isSelectMode) return;
+    if (!isOwner || isSelectMode) return;
     touchTimerRef.current = setTimeout(() => {
       onLongPress?.();
     }, 600);
@@ -99,12 +99,12 @@ const TraceCard = ({
           }
         }}
         className={`group w-full flex items-center justify-between p-4 sm:p-5 rounded-[24px] border border-black/[0.05] transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-black/25 select-none
-          ${isRecent ? "bg-[#efefec]" : "bg-white"}
+          ${isOwner ? "bg-white" : "bg-[#f5f5f7]"}
           ${isSelected ? "ring-2 ring-black bg-neutral-50/50 border-black/20" : ""}
           hover:border-black/10 active:scale-[0.99]`}
       >
         <div className="flex items-center min-w-0 flex-1">
-          {isSelectMode && !isRecent && (
+          {isSelectMode && isOwner && (
             <div
               onClick={(e) => {
                 e.stopPropagation();
@@ -127,9 +127,12 @@ const TraceCard = ({
           )}
 
           <div className="min-w-0 text-left flex-1">
-            <h3 className="text-[15px] font-semibold text-black tracking-tight leading-snug truncate">
-              {title}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-[15px] font-semibold text-black tracking-tight leading-snug truncate">
+                {title}
+              </h3>
+              <span title={isOwner ? "Owner" : "Shared"}><User className="w-3.5 h-3.5 text-black/25 shrink-0" /></span>
+            </div>
 
             <div className="flex items-center gap-1.5 mt-1.5">
               <span className="text-[13px] text-black/50 truncate max-w-[140px] sm:max-w-[220px] font-medium leading-none">
@@ -152,8 +155,7 @@ const TraceCard = ({
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-2 sm:ml-3">
-          {/* More icon — dropdown on mobile & desktop */}
-          {!isSelectMode && (
+          {!isSelectMode && isOwner && (
             <div className="relative" ref={menuRef}>
               <button
                 onClick={(e) => {
@@ -236,9 +238,12 @@ const TraceCard = ({
               <X className="w-3.5 h-3.5 text-black/50" />
             </button>
 
-            <h3 className="text-[20px] font-bold tracking-tight text-black pr-8">
-              {title}
-            </h3>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-[20px] font-bold tracking-tight text-black pr-8">
+                {title}
+              </h3>
+              <span title={isOwner ? "Owner" : "Shared"}><User className="w-4 h-4 text-black/25 shrink-0" /></span>
+            </div>
 
             <div className="mt-5 space-y-3">
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#f5f5f7]">
