@@ -67,8 +67,8 @@ function MapContent() {
       </div>
 
       {/* Bottom card */}
-      <div className="absolute left-[6%] right-[6%] bottom-[5%] bg-white/95 backdrop-blur-xl rounded-[16px] border border-black/[0.04] p-3.5 shadow-[0_-2px_20px_rgba(0,0,0,0.06)] z-20">
-        <p className="text-[8px] font-semibold text-black/35 uppercase tracking-wide mb-1">
+      <div className="absolute left-[6%] right-[6%] bottom-[5%] bg-white/95 backdrop-blur-xl rounded-[12px] border border-black/[0.04] p-3 shadow-[0_-2px_20px_rgba(0,0,0,0.06)] z-20">
+        <p className="text-[7px] font-semibold text-black/35 uppercase tracking-wide mb-0.5">
           Finding friends in a crowd
         </p>
         <p className="text-[11px] font-medium leading-snug text-black/80 tracking-tight">
@@ -94,18 +94,18 @@ function MapContent() {
 export default function ScenarioPreview() {
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-[320px]">
+      <div className="relative w-full max-w-[260px]">
         {/* Phone bezel */}
-        <div className="relative bg-black rounded-[44px] p-[4px] shadow-[0_24px_80px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)]">
+        <div className="relative bg-black rounded-[36px] p-[3px] shadow-[0_20px_60px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.05)]">
           {/* Side buttons */}
-          <div className="absolute left-[-3px] top-[90px] w-[3px] h-[30px] bg-[#3a3a3c] rounded-r-sm" />
-          <div className="absolute left-[-3px] top-[128px] w-[3px] h-[30px] bg-[#3a3a3c] rounded-r-sm" />
-          <div className="absolute right-[-3px] top-[100px] w-[3px] h-[40px] bg-[#3a3a3c] rounded-l-sm" />
+          <div className="absolute left-[-3px] top-[70px] w-[3px] h-[24px] bg-[#3a3a3c] rounded-r-sm" />
+          <div className="absolute left-[-3px] top-[100px] w-[3px] h-[24px] bg-[#3a3a3c] rounded-r-sm" />
+          <div className="absolute right-[-3px] top-[80px] w-[3px] h-[32px] bg-[#3a3a3c] rounded-l-sm" />
 
           {/* Screen */}
-          <div className="relative w-full aspect-[9/19.5] bg-[#f0f0f3] rounded-[40px] overflow-hidden">
+          <div className="relative w-full aspect-[9/17] bg-[#f0f0f3] rounded-[32px] overflow-hidden">
             {/* Dynamic Island */}
-            <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[70px] h-[18px] bg-black rounded-full z-30" />
+            <div className="absolute top-[6px] left-1/2 -translate-x-1/2 w-[60px] h-[16px] bg-black rounded-full z-30" />
 
             {/* Glass reflection */}
             <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none z-20" />
@@ -115,10 +115,10 @@ export default function ScenarioPreview() {
         </div>
 
         {/* Bottom indicator bar */}
-        <div className="absolute bottom-[-8px] left-1/2 -translate-x-1/2 w-[100px] h-[4px] bg-black/10 rounded-full" />
+        <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-[80px] h-[3px] bg-black/10 rounded-full" />
       </div>
 
-      <p className="text-xs font-medium text-black/35 mt-8 text-center max-w-xs leading-relaxed tracking-tight">
+      <p className="text-xs font-medium text-black/35 mt-6 text-center max-w-xs leading-relaxed tracking-tight">
         Built for concerts, weddings, campuses, meetups,
         neighborhoods, and places where maps are not enough.
       </p>
