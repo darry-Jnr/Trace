@@ -613,7 +613,8 @@ export default function TraceWorkspacePage() {
 
   return (
     <div className="relative flex w-screen h-screen overflow-hidden bg-[#f5f5f7] font-sans selection:bg-black selection:text-white">
-      <div className="relative flex-1 h-full min-w-0 transition-all duration-300 z-0 [&_.mapboxgl-ctrl-logo]:hidden [&_.mapboxgl-ctrl-attrib]:hidden">
+      <div className="relative flex-1 h-full min-w-0 transition-all duration-300 z-0">
+        <style>{`.mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib{display:none!important}`}</style>
 
         {/* BACKDROP INTERACTIVE CANVAS ENGINE */}
         <MapCanvas mapRef={mapRef} onClearActive={() => setActiveWaypoint(null)} />
