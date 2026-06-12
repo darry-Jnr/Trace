@@ -10,7 +10,7 @@ interface StopReviewBarProps {
 
 export default function StopReviewBar({ distance, onDiscard, onSave }: StopReviewBarProps) {
   return (
-    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-50 w-full px-4 flex justify-center animate-fade-in-up">
+    <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-5 flex justify-center animate-fade-in-up">
       <div className="w-full max-w-[400px] h-14 rounded-xl bg-white/90 backdrop-blur-2xl border border-black/[0.04] shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex items-center justify-between px-4">
         <button
           onClick={onDiscard}

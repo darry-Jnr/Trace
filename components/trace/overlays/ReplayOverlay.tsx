@@ -146,22 +146,24 @@ export default function ReplayOverlay({
         </div>
       )}
 
-      {/* Completion modal */}
+      {/* Completion overlay */}
       {showCompletion && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm animate-fade-in">
-          <div className="mx-4 p-8 rounded-[32px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] flex flex-col items-center max-w-[320px]">
-            <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center mb-5">
-              <CheckCircle className="w-8 h-8 text-white" />
+        <div className="absolute inset-0 z-50 flex flex-col bg-white animate-fade-in">
+          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16">
+            <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mb-6 shadow-lg">
+              <CheckCircle className="w-10 h-10 text-white" />
             </div>
-            <h2 className="text-[22px] font-bold tracking-tight text-black text-center">
+            <h2 className="text-[28px] font-bold tracking-tight text-black text-center">
               You made it!
             </h2>
-            <p className="mt-2 text-[14px] text-black/50 font-medium text-center leading-relaxed">
-              You've successfully followed the entire route.
+            <p className="mt-2 text-[15px] text-black/50 font-medium text-center leading-relaxed max-w-[280px]">
+              You&apos;ve successfully followed the entire route.
             </p>
+          </div>
+          <div className="px-6 pb-10">
             <button
               onClick={onBack}
-              className="mt-6 w-full h-12 rounded-full bg-black text-white text-[14px] font-semibold tracking-tight active:scale-[0.98] transition-transform"
+              className="w-full h-14 rounded-2xl bg-black text-white text-[15px] font-semibold tracking-tight active:scale-[0.98] transition-transform"
             >
               Back to dashboard
             </button>
