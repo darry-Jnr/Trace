@@ -22,6 +22,7 @@ interface CommentSectionProps {
   onClose: () => void;
   onNameRequired: () => void;
   visitorName: string | null;
+  onCommentPosted?: () => void;
 }
 
 function formatTime(dateStr: string): string {
@@ -46,6 +47,7 @@ export default function CommentSection({
   onClose,
   onNameRequired,
   visitorName,
+  onCommentPosted,
 }: CommentSectionProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [input, setInput] = useState("");
@@ -99,6 +101,7 @@ export default function CommentSection({
       if (result.success) {
         setComments((prev) => [...prev, result.data]);
         setInput("");
+        onCommentPosted?.();
         setTimeout(() => {
           listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
         }, 100);

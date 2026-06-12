@@ -17,7 +17,8 @@ export function useMapEngine(
   isSynced: boolean = false,
   isFollowing: boolean = false,
   unlockedWaypointIds: Set<string> = new Set(),
-  progressCoords: [number, number][] = []
+  progressCoords: [number, number][] = [],
+  distanceToStart: number | null = null
 ) {
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -28,6 +29,10 @@ export function useMapEngine(
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mapboxglRef = useRef<any>(null);
   const lastSmoothRef = useRef(0);
+  const userCoordsRef = useRef<[number, number] | null>(null);
+  const lastAutoZoomRef = useRef(0);
+  const zoomModeRef = useRef<"far" | "near" | null>(null);
+  const lastCenteredRef = useRef<[number, number] | null>(null);
 
   // Mount Instance Mapbox Canvas
   useEffect(() => {
@@ -62,6 +67,7 @@ export function useMapEngine(
           attributionControl: false,
         });
 
+        const isReplayOnMount = isReplayMode;
         map.on("style.load", () => {
           map.setFog({
             color: "rgb(230, 240, 255)",
@@ -85,12 +91,18 @@ export function useMapEngine(
             layout: { "line-join": "round", "line-cap": "round" },
             paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
           });
+
+          // Retry replay visuals — map is now ready
+          if (isReplayOnMount) addReplayVisuals();
         });
 
-        // User marker (default blue)
+        // User marker — starts green in replay (viewer), blue in recording
         const el = document.createElement("div");
-        el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-4 border-white shadow-[0_2px_10px_rgba(0,82,255,0.4)] flex items-center justify-center relative";
-        el.innerHTML = `<span class="absolute inset-0 rounded-full bg-[#0052FF]/30 animate-ping scale-150 pointer-events-none" style="animation-duration: 2s;" />`;
+        const isViewerMode = isReplayMode && !isSynced;
+        el.className = `w-5 h-5 rounded-full border-4 border-white flex items-center justify-center relative`;
+        el.style.background = isViewerMode ? "#22C55E" : "#0052FF";
+        el.style.boxShadow = isViewerMode ? "0 2px 10px rgba(34,197,94,0.4)" : "0 2px 10px rgba(0,82,255,0.4)";
+        el.innerHTML = `<span class="absolute inset-0 rounded-full animate-ping scale-150 pointer-events-none" style="animation-duration: 2s; background: ${isViewerMode ? "#22C55E" : "#0052FF"}30" />`;
 
         const userMarker = new mapboxgl.Marker({ element: el }).setLngLat(baseLocation).addTo(map);
 
@@ -155,11 +167,7 @@ export function useMapEngine(
       });
 
       const startEl = document.createElement("div");
-      startEl.className = "flex flex-col items-center pointer-events-none";
-      startEl.innerHTML = `
-        <div class="w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)]"></div>
-        <span class="mt-1 px-2 py-0.5 rounded-full bg-black/80 text-white text-[10px] font-semibold tracking-tight backdrop-blur-sm">Start</span>
-      `;
+      startEl.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
       const coords = trailCoordsRef.current;
       const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
       const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
@@ -291,18 +299,38 @@ export function useMapEngine(
     }
   }, [isReplayMode, isFollowing]);
 
+  function getDistanceMeters(a: [number, number], b: [number, number]) {
+    const R = 6371000;
+    const dLat = ((b[1] - a[1]) * Math.PI) / 180;
+    const dLng = ((b[0] - a[0]) * Math.PI) / 180;
+    const sinLat = Math.sin(dLat / 2);
+    const sinLng = Math.sin(dLng / 2);
+    const a2 =
+      sinLat * sinLat +
+      Math.cos((a[1] * Math.PI) / 180) *
+        Math.cos((b[1] * Math.PI) / 180) *
+        sinLng * sinLng;
+    return R * 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1 - a2));
+  }
+
   const handleLocationStream = (coords: [number, number], heading: number | null) => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
+    userCoordsRef.current = coords;
     if (userMarkerRef.current) userMarkerRef.current.setLngLat(coords);
 
     if (isReplayMode && isFollowing) {
       const targetBearing = heading !== null && heading !== undefined ? heading : map.getBearing();
       map.easeTo({ center: coords, zoom: 17, bearing: targetBearing, duration: 1500 });
     } else if (!isReplayMode) {
-      const targetBearing = heading !== null && heading !== undefined ? heading : 0;
+      // Skip re-centering if user hasn't moved enough to prevent map shaking
+      const lastCenter = lastCenteredRef.current;
+      if (lastCenter && getDistanceMeters(lastCenter, coords) < 5) return;
+
+      const targetBearing = heading !== null && heading !== undefined ? heading : map.getBearing();
       map.easeTo({ center: coords, zoom: 17, bearing: targetBearing, duration: 1100 });
+      lastCenteredRef.current = coords;
     }
   };
 
@@ -489,6 +517,38 @@ export function useMapEngine(
     if (!map) return;
     map.zoomOut({ duration: 300 });
   };
+
+  // Auto-zoom in replay mode
+  useEffect(() => {
+    if (!isReplayMode || distanceToStart === null || !mapInstanceRef.current) return;
+    const now = Date.now();
+    if (now - lastAutoZoomRef.current < 3000) return;
+    lastAutoZoomRef.current = now;
+
+    const map = mapInstanceRef.current;
+    const user = userCoordsRef.current;
+    const start = trailCoordinates.length > 0 ? trailCoordinates[0] : null;
+    if (!user || !start) return;
+
+    const farThreshold = zoomModeRef.current === "near" ? 120 : 100;
+    const nearThreshold = zoomModeRef.current === "far" ? 80 : 100;
+
+    if (distanceToStart > farThreshold) {
+      zoomModeRef.current = "far";
+      const bounds = new mapboxglRef.current.LngLatBounds();
+      bounds.extend(user);
+      bounds.extend(start);
+      map.fitBounds(bounds, { padding: 100, duration: 2000, maxZoom: 14 });
+    } else if (distanceToStart > 15 && distanceToStart < nearThreshold) {
+      zoomModeRef.current = "near";
+      const mid: [number, number] = [
+        (user[0] + start[0]) / 2,
+        (user[1] + start[1]) / 2,
+      ];
+      const zoom = Math.min(17, 14 + (1 - distanceToStart / 100) * 3);
+      map.easeTo({ center: mid, zoom, duration: 2000 });
+    }
+  }, [isReplayMode, distanceToStart, trailCoordinates]);
 
   return { viewMode, toggleViewPerspective, handleLocationStream, updateVectorPath, centerOnCoords, zoomIn, zoomOut, mapError };
 }

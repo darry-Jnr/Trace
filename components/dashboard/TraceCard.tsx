@@ -140,8 +140,7 @@ const TraceCard = ({
                   title="Copy link"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigator.clipboard.writeText(link);
-                    (window as any).pendo?.track('Trace Shared', { traceId: link });
+                    onShare?.();
                   }}
                   className="text-black/30 hover:text-black transition-colors shrink-0"
                 >

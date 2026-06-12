@@ -9,7 +9,6 @@ interface ReplayOverlayProps {
   distanceToStart: number | null;
   trailProgress: number;
   activeWaypoint: WaypointMedia | null;
-  onStartGuidance: () => void;
   onDismissWaypoint: () => void;
   onBack: () => void;
   onCommentsClick: () => void;
@@ -26,22 +25,12 @@ export default function ReplayOverlay({
   distanceToStart,
   trailProgress,
   activeWaypoint,
-  onStartGuidance,
   onDismissWaypoint,
   onBack,
   onCommentsClick,
   commentCount = 0,
 }: ReplayOverlayProps) {
-  const [showSyncAnimation, setShowSyncAnimation] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
-
-  useEffect(() => {
-    if (guidanceState === "synced") {
-      setShowSyncAnimation(true);
-      const timer = setTimeout(() => setShowSyncAnimation(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [guidanceState]);
 
   useEffect(() => {
     if (guidanceState === "complete") {
@@ -105,8 +94,8 @@ export default function ReplayOverlay({
         </div>
       )}
 
-      {/* Progress badge — top-center when following */}
-      {guidanceState === "following" && (
+      {/* Progress badge — top-center when following or complete */}
+      {(guidanceState === "following" || guidanceState === "complete") && (
         <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 animate-fade-in">
           <div className="px-4 py-2 rounded-full bg-black/80 backdrop-blur-2xl border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.2)] flex items-center gap-2.5">
             <div className="w-1.5 h-1.5 rounded-full bg-white/50 animate-pulse" />
@@ -114,36 +103,6 @@ export default function ReplayOverlay({
               {trailProgress}%
             </span>
           </div>
-        </div>
-      )}
-
-      {/* Sync animation — center screen */}
-      {showSyncAnimation && guidanceState === "synced" && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-4 animate-fade-in">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 animate-ping absolute" />
-              <div className="w-16 h-16 rounded-full bg-black border-4 border-white shadow-lg flex items-center justify-center relative">
-                <CheckCircle className="w-7 h-7 text-white" />
-              </div>
-            </div>
-            <p className="text-white text-sm font-semibold bg-black/60 px-4 py-2 rounded-full backdrop-blur-md">
-              Location synced
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Start guidance button — center-bottom when synced */}
-      {guidanceState === "synced" && !showSyncAnimation && (
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 animate-fade-in-up">
-          <button
-            onClick={onStartGuidance}
-            className="h-14 px-8 rounded-full bg-black text-white text-[15px] font-semibold tracking-tight shadow-[0_8px_30px_rgba(0,0,0,0.2)] flex items-center gap-2.5 hover:scale-[1.02] active:scale-[0.97] transition-all"
-          >
-            <MapPin className="w-4 h-4" />
-            Start following route
-          </button>
         </div>
       )}
 

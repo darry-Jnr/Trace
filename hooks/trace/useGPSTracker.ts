@@ -114,7 +114,7 @@ export function useGPSTracker(
         const accuracy = position.coords.accuracy;
         const heading = position.coords.heading;
 
-        if (accuracy > 25 && isRecordingRef.current) return;
+        if (accuracy > (isRecordingRef.current ? 25 : 100)) return;
 
         const finalCoords = kalmanFilterRef.current.update(
           [rawLng, rawLat],

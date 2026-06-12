@@ -24,7 +24,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-[#f5f5f7] text-black selection:bg-black/10">
       <Navbar />
       <MobileNudge dismissed={bannerDismissed} onDismiss={handleDismiss} />
-      <main className={`transition-all duration-300 ${bannerDismissed ? "pt-16" : "pt-32"}`}>
+      <main className={`transition-all duration-300 ${bannerDismissed ? "pt-16" : "pt-16 md:pt-32"}`}>
         <Main />
       </main>
     </div>

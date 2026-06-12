@@ -92,7 +92,7 @@ export default function SaveReviewModal({
             <button
               onClick={onClose}
               disabled={savePhase === "saving"}
-              className="w-10 h-10 rounded-full bg-white border border-black/[0.06] flex items-center justify-center shadow-sm active:scale-95 transition disabled:opacity-30"
+              className="w-10 h-10 rounded-full bg-white border border-black/[0.06] flex items-center justify-center shadow-sm active:scale-95 transition disabled:opacity-0 disabled:pointer-events-none"
             >
               <X className="w-4 h-4 text-black/70" />
             </button>

@@ -66,10 +66,10 @@ export function useReplayGuidance(
 
     if (dist <= SYNC_THRESHOLD && !syncedRef.current) {
       syncedRef.current = true;
-      setGuidanceState("synced");
+      setGuidanceState("following");
     }
 
-    if (guidanceState === "following") {
+    if (guidanceState === "following" || syncedRef.current) {
       for (const wp of waypoints) {
         if (!triggeredWpRef.current.has(wp.id)) {
           const wpDist = getDistance(userLocation, wp.coordinates);

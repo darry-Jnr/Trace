@@ -153,6 +153,16 @@ export default function TraceWorkspacePage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isReplayMode]);
 
+  const dataURLToBlob = (dataUrl: string): Blob => {
+    const parts = dataUrl.split(",");
+    const mimeMatch = parts[0]?.match(/:(.*?);/);
+    const mime = mimeMatch?.[1] || "image/jpeg";
+    const decoded = atob(parts[1] || "");
+    const buf = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) buf[i] = decoded.charCodeAt(i);
+    return new Blob([buf], { type: mime });
+  };
+
   const uploadFile = useCallback(async (
     file: File,
     traceId: string,
@@ -351,7 +361,8 @@ export default function TraceWorkspacePage() {
     guidanceState === "synced",
     guidanceState === "following",
     unlockedWaypointIds,
-    progressCoords
+    progressCoords,
+    distanceToStart
   );
 
 
@@ -399,13 +410,15 @@ export default function TraceWorkspacePage() {
     const targetCoords = getCurrentCapturePoint();
     const wpId = `wp-${Date.now()}`;
     pendingMediaRef.current.set(wpId, imageDataUrl);
+    // Convert data URL to blob URL for preview (avoids storing large base64 in state/localStorage)
+    const blobUrl = URL.createObjectURL(dataURLToBlob(imageDataUrl));
     const newMedia: WaypointMedia = {
       id: wpId,
       type: "image",
       content: "",
       category: "Photo",
       coordinates: targetCoords,
-      fileUrl: imageDataUrl,
+      fileUrl: blobUrl,
     };
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
@@ -413,10 +426,14 @@ export default function TraceWorkspacePage() {
   };
 
   const getNextUntitledTitle = () => {
-    let counter = parseInt(localStorage.getItem("untitled_counter") || "0", 10);
-    counter += 1;
-    localStorage.setItem("untitled_counter", String(counter));
-    return `Untitled ${counter}`;
+    try {
+      let counter = parseInt(localStorage.getItem("untitled_counter") || "0", 10);
+      counter += 1;
+      localStorage.setItem("untitled_counter", String(counter));
+      return `Untitled ${counter}`;
+    } catch {
+      return "Untitled";
+    }
   };
 
   const handleToggleRecord = () => {
@@ -439,8 +456,9 @@ export default function TraceWorkspacePage() {
     setSavePhase("saving");
 
     // 1. Upload any pending media files to Supabase Storage
-      const uploadPromises: Promise<void>[] = [];
-      for (const wp of savedMedia) {
+    const uploadedUrls = new Map<string, string>();
+    const uploadPromises: Promise<void>[] = [];
+    for (const wp of savedMedia) {
       const pendingData = pendingMediaRef.current.get(wp.id);
       if (!pendingData) continue;
 
@@ -449,9 +467,7 @@ export default function TraceWorkspacePage() {
         const file = new File([blob], `voice-${wp.id}.webm`, { type: "audio/webm" });
         uploadPromises.push(
           uploadFile(file, id, wp.id).then((url) => {
-            if (url) {
-              setSavedMedia((prev) => prev.map((m) => m.id === wp.id ? { ...m, fileUrl: url } : m));
-            }
+            if (url) uploadedUrls.set(wp.id, url);
           })
         );
       } else if (wp.type === "image") {
@@ -463,9 +479,7 @@ export default function TraceWorkspacePage() {
               const blob = await res.blob();
               const file = new File([blob], `photo-${wp.id}.jpg`, { type: "image/jpeg" });
               const url = await uploadFile(file, id, wp.id);
-              if (url) {
-                setSavedMedia((prev) => prev.map((m) => m.id === wp.id ? { ...m, fileUrl: url } : m));
-              }
+              if (url) uploadedUrls.set(wp.id, url);
             } catch (e) {
               console.error("Failed to upload image for waypoint", wp.id, e);
             }
@@ -478,6 +492,16 @@ export default function TraceWorkspacePage() {
     await Promise.all(uploadPromises);
     pendingMediaRef.current.clear();
 
+    // Revoke old blob URLs to prevent memory leaks
+    for (const m of savedMedia) {
+      if (m.fileUrl?.startsWith("blob:")) URL.revokeObjectURL(m.fileUrl);
+    }
+
+    // Merge uploaded URLs into media before saving
+    const finalMedia = savedMedia.map((m) =>
+      uploadedUrls.has(m.id) ? { ...m, fileUrl: uploadedUrls.get(m.id)! } : m
+    );
+
     const dateString = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
     const newTrace = {
       id: id,
@@ -485,7 +509,7 @@ export default function TraceWorkspacePage() {
       link: `${window.location.origin}/trace/${id}`,
       date: dateString,
       coordinates: trailCoordinates,
-      waypoints: savedMedia,
+      waypoints: finalMedia,
       distance: traceDistance,
     };
 
@@ -538,6 +562,7 @@ export default function TraceWorkspacePage() {
 
   const handleCloseSaveReview = () => {
     setShowSaveReview(false);
+    setSavePhase("idle");
   };
 
   const handleDiscardTrace = () => {
@@ -610,7 +635,6 @@ export default function TraceWorkspacePage() {
             distanceToStart={distanceToStart}
             trailProgress={trailProgress}
             activeWaypoint={replayActiveWaypoint}
-            onStartGuidance={startGuidance}
             onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}
             commentCount={commentCount}
@@ -639,6 +663,7 @@ export default function TraceWorkspacePage() {
               setShowNameModal(true);
             }}
             visitorName={commentName}
+            onCommentPosted={() => setCommentCount((c) => c + 1)}
           />
         )}
 
