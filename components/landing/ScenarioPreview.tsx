@@ -104,6 +104,31 @@ export default function ScenarioPreview() {
 
           {/* Screen */}
           <div className="relative w-full aspect-[9/17] bg-[#f0f0f3] rounded-[32px] overflow-hidden">
+            {/* Status bar */}
+            <div className="absolute top-0 inset-x-0 h-[22px] flex items-center justify-between px-5 z-30 text-black/70 text-[10px] font-semibold tracking-tight">
+              <span>9:41</span>
+              <div className="flex items-center gap-[5px]">
+                <svg className="w-[15px] h-[15px]" viewBox="0 0 20 20" fill="none">
+                  <rect x="1" y="13" width="2.5" height="4" rx="0.5" fill="currentColor" opacity="0.3" />
+                  <rect x="4.5" y="10" width="2.5" height="7" rx="0.5" fill="currentColor" opacity="0.3" />
+                  <rect x="8" y="7" width="2.5" height="10" rx="0.5" fill="currentColor" opacity="0.6" />
+                  <rect x="11.5" y="4" width="2.5" height="13" rx="0.5" fill="currentColor" />
+                  <rect x="15" y="1" width="2" height="16" rx="0.5" fill="currentColor" />
+                </svg>
+                <svg className="w-[13px] h-[13px]" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 2C6.5 2 4 5 4 8c0 4 6 10 6 10s6-6 6-10c0-3-2.5-6-6-6z" stroke="currentColor" strokeWidth="1.8" />
+                  <circle cx="10" cy="8" r="2.5" fill="currentColor" />
+                </svg>
+                <div className="flex items-center">
+                  <div className="w-[22px] h-[10px] rounded-[3px] border border-black/50 flex items-center justify-center relative">
+                    <div className="h-[6px] bg-black/70 rounded-[1.5px]" style={{ width: `${Math.min(85, 100)}%`, marginRight: 'auto', marginLeft: '1.5px' }} />
+                    <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-black/70">85</span>
+                  </div>
+                  <div className="w-[2px] h-[4px] rounded-r-[1px] bg-black/50 -ml-[0.5px]" />
+                </div>
+              </div>
+            </div>
+
             {/* Dynamic Island */}
             <div className="absolute top-[6px] left-1/2 -translate-x-1/2 w-[60px] h-[16px] bg-black rounded-full z-30" />
 
