@@ -57,107 +57,133 @@ const Main = () => {
       let owned: TraceItem[] = [];
       let shared: TraceItem[] = [];
 
-      // Parse owned traces from localStorage
-      if (stored) {
-        try {
-          const localTraces = JSON.parse(stored) as { id: string; title: string; link: string; date: string; distance?: string }[];
-          const ids = localTraces.map((t) => t.id);
+      try {
+        // Parse owned traces from localStorage
+        if (stored) {
+          try {
+            const localTraces = JSON.parse(stored) as { id: string; title: string; link: string; date: string; distance?: string }[];
+            const ids = localTraces.map((t) => t.id);
 
-          if (ids.length > 0) {
-            const res = await fetch("/api/trace/list", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ids }),
-            });
+            if (ids.length > 0) {
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 8000);
+              try {
+                const res = await fetch("/api/trace/list", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ids }),
+                  signal: controller.signal,
+                });
+                clearTimeout(timeout);
 
-            if (res.ok) {
-              const result = await res.json();
-              if (result.success && result.data) {
-                owned = result.data.map((t: any) => ({
-                  id: t.id,
-                  title: t.title,
-                  link: `${window.location.origin}/trace/${t.id}`,
-                  date: t.date,
-                  distance: t.distance,
-                  isOwner: true,
-                }));
-              } else {
-                owned = localTraces.map((t) => ({ ...t, isOwner: true }));
-              }
-            } else {
-              owned = localTraces.map((t) => ({ ...t, isOwner: true }));
-            }
-          }
-        } catch (e) {
-          console.error("Failed loading owned traces:", e);
-        }
-      }
-
-      // Recover ownership from Supabase by visitor_id
-      // Fills the gap if localStorage was cleared but traces still exist server-side
-      if (visitorId) {
-        try {
-          const res = await fetch(`/api/trace/mine?visitor_id=${encodeURIComponent(visitorId)}`);
-          if (res.ok) {
-            const result = await res.json();
-            if (result.success && Array.isArray(result.data)) {
-              const ownedIds = new Set(owned.map((t) => t.id));
-              const recovered = result.data
-                .filter((t: any) => !ownedIds.has(t.id))
-                .map((t: any) => ({
-                  id: t.id,
-                  title: t.title,
-                  link: `${window.location.origin}/trace/${t.id}`,
-                  date: t.date,
-                  distance: t.distance,
-                  isOwner: true,
-                }));
-
-              // Also re-sync recovered traces back to localStorage
-              if (recovered.length > 0) {
-                try {
-                  const existing = JSON.parse(localStorage.getItem("saved_traces") || "[]");
-                  const existingIds = new Set(existing.map((t: any) => t.id));
-                  const toAdd = recovered.filter((t: TraceItem) => !existingIds.has(t.id));
-                  if (toAdd.length > 0) {
-                    localStorage.setItem(
-                      "saved_traces",
-                      JSON.stringify([...toAdd, ...existing])
-                    );
+                if (res.ok) {
+                  const result = await res.json();
+                  if (result.success && result.data) {
+                    owned = result.data.map((t: any) => ({
+                      id: t.id,
+                      title: t.title,
+                      link: `${window.location.origin}/trace/${t.id}`,
+                      date: t.date,
+                      distance: t.distance,
+                      isOwner: true,
+                    }));
+                  } else {
+                    owned = localTraces.map((t) => ({ ...t, isOwner: true }));
                   }
-                } catch {}
-                owned = [...owned, ...recovered];
+                } else {
+                  owned = localTraces.map((t) => ({ ...t, isOwner: true }));
+                }
+              } catch (e) {
+                clearTimeout(timeout);
+                owned = localTraces.map((t) => ({ ...t, isOwner: true }));
+                console.error("Failed loading owned traces:", e);
               }
             }
+          } catch (e) {
+            console.error("Failed parsing saved_traces:", e);
           }
-        } catch (e) {
-          console.error("Failed recovering traces from Supabase:", e);
         }
-      }
 
-      // Parse recently viewed (shared traces — traces you opened via someone else's link)
-      if (recentRaw) {
-        try {
-          const parsed = JSON.parse(recentRaw) as { id: string; title: string; date: string; distance?: string }[];
-          shared = parsed.map((t) => ({
-            ...t,
-            link: `${window.location.origin}/trace/${t.id}`,
-            isOwner: false,
-          }));
-        } catch (e) {
-          console.error("Failed loading recently viewed:", e);
+        // Recover ownership from Supabase by visitor_id
+        // Fills the gap if localStorage was cleared but traces still exist server-side
+        if (visitorId) {
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            try {
+              const res = await fetch(`/api/trace/mine?visitor_id=${encodeURIComponent(visitorId)}`, {
+                signal: controller.signal,
+              });
+              clearTimeout(timeout);
+
+              if (res.ok) {
+                const result = await res.json();
+                if (result.success && Array.isArray(result.data)) {
+                  const ownedIds = new Set(owned.map((t) => t.id));
+                  const recovered = result.data
+                    .filter((t: any) => !ownedIds.has(t.id))
+                    .map((t: any) => ({
+                      id: t.id,
+                      title: t.title,
+                      link: `${window.location.origin}/trace/${t.id}`,
+                      date: t.date,
+                      distance: t.distance,
+                      isOwner: true,
+                    }));
+
+                  // Also re-sync recovered traces back to localStorage
+                  if (recovered.length > 0) {
+                    try {
+                      const existing = JSON.parse(localStorage.getItem("saved_traces") || "[]");
+                      const existingIds = new Set(existing.map((t: any) => t.id));
+                      const toAdd = recovered.filter((t: TraceItem) => !existingIds.has(t.id));
+                      if (toAdd.length > 0) {
+                        localStorage.setItem(
+                          "saved_traces",
+                          JSON.stringify([...toAdd, ...existing])
+                        );
+                      }
+                    } catch {}
+                    owned = [...owned, ...recovered];
+                  }
+                }
+              }
+            } catch (e) {
+              clearTimeout(timeout);
+              console.error("Failed recovering traces from Supabase:", e);
+            }
+          } catch (e) {
+            console.error("Failed recovery fetch setup:", e);
+          }
         }
+
+        // Parse recently viewed (shared traces — traces you opened via someone else's link)
+        if (recentRaw) {
+          try {
+            const parsed = JSON.parse(recentRaw) as { id: string; title: string; date: string; distance?: string }[];
+            shared = parsed.map((t) => ({
+              ...t,
+              link: `${window.location.origin}/trace/${t.id}`,
+              isOwner: false,
+            }));
+          } catch (e) {
+            console.error("Failed loading recently viewed:", e);
+          }
+        }
+
+        // Dedupe: if a trace is in both owned and shared, keep the owned version
+        const ownedIds = new Set(owned.map((t) => t.id));
+        const merged = [...owned, ...shared.filter((t) => !ownedIds.has(t.id))];
+
+        // Sort by date descending (newest first)
+        merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setMyTraces(merged);
+      } catch (e) {
+        console.error("fetchTraces unexpected error:", e);
+      } finally {
+        setIsLoaded(true);
       }
-
-      // Dedupe: if a trace is in both owned and shared, keep the owned version
-      const ownedIds = new Set(owned.map((t) => t.id));
-      const merged = [...owned, ...shared.filter((t) => !ownedIds.has(t.id))];
-
-      // Sort by date descending (newest first)
-      merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      setMyTraces(merged);
-      setIsLoaded(true);
     }
 
     fetchTraces();
