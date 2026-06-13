@@ -249,7 +249,7 @@ export default function TraceWorkspacePage() {
               setTraceDate(fetchedTrace.date);
             }
             setShowSaveReview(false);
-            (window as any).pendo?.track('Trace Opened', { traceId: id, source: 'shared_link' });
+            (window as any).pendo?.track('Trace Opened', { traceId: id, source: 'shared_link', title: fetchedTrace.title, waypointCount: fetchedTrace.waypoints?.length || 0, distance: fetchedTrace.distance });
 
             // Save to recently_viewed for dashboard
             try {
@@ -362,6 +362,13 @@ export default function TraceWorkspacePage() {
     isReplayMode
   );
 
+  // Track trail completion for in-person guidance (not simulation)
+  useEffect(() => {
+    if (guidanceState === "complete" && !isSimulating) {
+      (window as any).pendo?.track('Trail Completed', { traceId: id, trailProgress });
+    }
+  }, [guidanceState, id, trailProgress, isSimulating]);
+
   // Engine Connection #1: Mapbox canvas lifecycle engine
   const {
     viewMode,
@@ -429,6 +436,7 @@ export default function TraceWorkspacePage() {
 
   const handleStartSimulation = useCallback(() => {
     if (trailCoordinates.length < 2) return;
+    (window as any).pendo?.track('Simulation Started', { traceId: id, traceTitle: traceTitleInput, coordinateCount: trailCoordinates.length, distance: traceDistance });
     simulatedIndexRef.current = 0;
     setSimulatedIndex(0);
     setIsSimPlay(true);
@@ -437,7 +445,7 @@ export default function TraceWorkspacePage() {
     startGuidance();
     // Jump map to start of trail
     centerOnCoords(trailCoordinates[0]);
-  }, [trailCoordinates, startGuidance, centerOnCoords]);
+  }, [trailCoordinates, startGuidance, centerOnCoords, id, traceTitleInput, traceDistance]);
 
   const handleStopSimulation = useCallback(() => {
     if (simIntervalRef.current) clearInterval(simIntervalRef.current);
@@ -569,6 +577,7 @@ export default function TraceWorkspacePage() {
 
   const handleToggleRecord = () => {
     if (isRecording) {
+      (window as any).pendo?.track('Recording Stopped', { traceId: id, distance: formatDistanceFromMeters(totalDistanceRef.current), waypointCount: savedMedia.length, coordinateCount: trailCoordsRef.current.length });
       setIsRecording(false);
       setTraceTitleInput(getNextUntitledTitle());
       setTrailCoordinates(trailCoordsRef.current);
@@ -589,6 +598,7 @@ export default function TraceWorkspacePage() {
       setIsRecording(true);
       setIsAddMenuOpen(false);
       setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
+      (window as any).pendo?.track('Recording Started', { traceId: id, hasGpsFix });
     }
   };
 
@@ -709,6 +719,7 @@ export default function TraceWorkspacePage() {
   };
 
   const handleDiscardTrace = () => {
+    (window as any).pendo?.track('Trace Discarded', { traceId: id, distance: traceDistance, waypointCount: savedMedia.length });
     setShowSaveReview(false);
     setTrailCoordinates([]);
     trailCoordsRef.current = [];
@@ -781,7 +792,10 @@ export default function TraceWorkspacePage() {
             activeWaypoint={replayActiveWaypoint}
             syncPrompt={syncPrompt}
             skipPercent={skipPercent}
-            onStartGuidance={startGuidance}
+            onStartGuidance={() => {
+              (window as any).pendo?.track('Trail Guidance Started', { traceId: id, syncType: syncPrompt || 'start', skipPercent, distanceToStart });
+              startGuidance();
+            }}
             onDismissSyncPrompt={dismissSyncPrompt}
             onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}

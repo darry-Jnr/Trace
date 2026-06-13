@@ -102,6 +102,7 @@ export default function CommentSection({
         setComments((prev) => [...prev, result.data]);
         setInput("");
         onCommentPosted?.();
+        (window as any).pendo?.track('Comment Posted', { traceId, authorName: visitorName, contentLength: text.length, commentCount: comments.length + 1, isAuthor });
         setTimeout(() => {
           listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
         }, 100);
@@ -125,6 +126,8 @@ export default function CommentSection({
       });
       const result = await res.json();
       if (result.success) {
+        const toggled = comments.find((c) => c.id === commentId);
+        (window as any).pendo?.track('Comment Pinned', { traceId, commentId, isPinned: !toggled?.is_pinned });
         setComments((prev) =>
           prev.map((c) =>
             c.id === commentId ? { ...c, is_pinned: !c.is_pinned } : c
@@ -151,6 +154,7 @@ export default function CommentSection({
       const result = await res.json();
       if (result.success) {
         setComments((prev) => prev.filter((c) => c.id !== commentId));
+        (window as any).pendo?.track('Comment Deleted', { traceId, commentId });
       } else {
         toast.error("Failed to delete", result.error || "Something went wrong");
       }
