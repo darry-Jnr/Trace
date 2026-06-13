@@ -357,7 +357,7 @@ export function useMapEngine(
     const source = map.getSource("recording-trail-source") as mapboxgl.GeoJSONSource;
     if (source) {
       const now = Date.now();
-      const simplified = douglasPeucker(coordinates, 2);
+      const simplified = douglasPeucker(coordinates, 0.5);
       const coords = smooth && (now - lastSmoothRef.current > 2000 || simplified.length < 10)
         ? chaikinSmooth(simplified)
         : simplified;

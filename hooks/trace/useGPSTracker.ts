@@ -137,7 +137,7 @@ export function useGPSTracker(
             const lastSavedPoint = history[history.length - 1];
             const distanceMoved = getDistanceMeters(lastSavedPoint, finalCoords);
 
-            if (distanceMoved > 3.5) {
+            if (distanceMoved > 1.5) {
               pathCoordsRef.current = [...history, finalCoords];
               onPathAppendRef.current(pathCoordsRef.current);
             }
