@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type mapboxgl from "mapbox-gl";
 import { ViewMode, WaypointMedia, WaypointGroup, groupWaypoints, CACHE_KEY } from "@/types";
 import { chaikinSmooth } from "./chaikinSmooth";
-import { douglasPeucker } from "./douglasPeucker";
 
 export function useMapEngine(
   mapRef: React.RefObject<HTMLDivElement | null>,
@@ -29,7 +28,6 @@ export function useMapEngine(
   const [mapError, setMapError] = useState<string | null>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mapboxglRef = useRef<any>(null);
-  const lastSmoothRef = useRef(0);
   const userCoordsRef = useRef<[number, number] | null>(null);
   const lastAutoZoomRef = useRef(0);
   const zoomModeRef = useRef<"far" | "near" | null>(null);
@@ -91,7 +89,7 @@ export function useMapEngine(
             type: "line",
             source: "recording-trail-source",
             layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
+        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
           });
 
           map.addSource("accuracy-circle-source", {
@@ -189,7 +187,7 @@ export function useMapEngine(
         type: "line",
         source: "progress-trail-source",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
+        paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
       });
 
       const startEl = document.createElement("div");
@@ -393,21 +391,15 @@ export function useMapEngine(
     });
   }, [unlockedWaypointIds, isReplayMode]);
 
-  const updateVectorPath = (coordinates: [number, number][], smooth = true) => {
+  const updateVectorPath = (coordinates: [number, number][]) => {
     const map = mapInstanceRef.current;
     if (!map) return;
     const source = map.getSource("recording-trail-source") as mapboxgl.GeoJSONSource;
     if (source) {
-      const now = Date.now();
-      const simplified = douglasPeucker(coordinates, 0.5);
-      const coords = smooth && (now - lastSmoothRef.current > 2000 || simplified.length < 10)
-        ? chaikinSmooth(simplified)
-        : simplified;
-      if (smooth) lastSmoothRef.current = now;
       source.setData({
         type: "Feature",
         properties: {},
-        geometry: { type: "LineString", coordinates: coords },
+        geometry: { type: "LineString", coordinates },
       });
     }
   };

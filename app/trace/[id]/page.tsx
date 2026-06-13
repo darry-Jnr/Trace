@@ -297,7 +297,7 @@ export default function TraceWorkspacePage() {
     (updatedPath: [number, number][]) => {
       if (!isReplayMode && isRecording) {
         trailCoordsRef.current = updatedPath;
-        updateVectorPath(updatedPath, false);
+        updateVectorPath(updatedPath);
 
         if (updatedPath.length >= 2) {
           const last = updatedPath[updatedPath.length - 1];
