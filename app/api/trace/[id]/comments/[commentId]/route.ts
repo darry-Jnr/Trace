@@ -6,6 +6,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; commentId: string }> }
 ) {
   const supabase = getSupabaseClient();
+  const visitorId = request.headers.get("x-visitor-id");
   try {
     const { id, commentId } = await params;
 
@@ -16,11 +17,17 @@ export async function DELETE(
       );
     }
 
-    const { error } = await supabase
+    let query = supabase
       .from("comments")
       .delete()
       .eq("id", commentId)
       .eq("trace_id", id);
+
+    if (visitorId) {
+      query = query.setHeader("x-visitor-id", visitorId);
+    }
+
+    const { error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -31,3 +38,4 @@ export async function DELETE(
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

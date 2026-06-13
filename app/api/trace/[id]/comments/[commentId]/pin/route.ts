@@ -6,6 +6,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string; commentId: string }> }
 ) {
   const supabase = getSupabaseClient();
+  const visitorId = request.headers.get("x-visitor-id");
   try {
     const { id, commentId } = await params;
 
@@ -31,24 +32,36 @@ export async function POST(
 
     // If pinning, unpin any other currently pinned comment first
     if (newPinned) {
-      const { error: unpinError } = await supabase
+      let unpinQuery = supabase
         .from("comments")
         .update({ is_pinned: false })
         .eq("trace_id", id)
         .eq("is_pinned", true);
+
+      if (visitorId) {
+        unpinQuery = unpinQuery.setHeader("x-visitor-id", visitorId);
+      }
+
+      const { error: unpinError } = await unpinQuery;
 
       if (unpinError) {
         return NextResponse.json({ error: unpinError.message }, { status: 500 });
       }
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("comments")
       .update({ is_pinned: newPinned })
       .eq("id", commentId)
       .eq("trace_id", id)
       .select()
       .single();
+
+    if (visitorId) {
+      query = query.setHeader("x-visitor-id", visitorId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -59,3 +72,4 @@ export async function POST(
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

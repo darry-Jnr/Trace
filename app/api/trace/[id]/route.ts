@@ -34,6 +34,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = getSupabaseClient();
+  const visitorId = request.headers.get("x-visitor-id");
   try {
     const { id } = await params;
     const body = await request.json();
@@ -42,11 +43,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Missing trace ID" }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("traces")
       .update({ title: body.title })
       .eq("id", id)
       .select();
+
+    if (visitorId) {
+      query = query.setHeader("x-visitor-id", visitorId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -63,6 +70,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = getSupabaseClient();
+  const visitorId = request.headers.get("x-visitor-id");
   try {
     const { id } = await params;
 
@@ -70,11 +78,17 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing trace ID" }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("traces")
       .delete()
       .eq("id", id)
       .select();
+
+    if (visitorId) {
+      query = query.setHeader("x-visitor-id", visitorId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -85,3 +99,4 @@ export async function DELETE(
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

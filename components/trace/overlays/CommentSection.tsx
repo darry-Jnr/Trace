@@ -116,8 +116,12 @@ export default function CommentSection({
 
   const handleTogglePin = async (commentId: string) => {
     try {
+      const visitorId = localStorage.getItem("visitor_id") || "";
       const res = await fetch(`/api/trace/${traceId}/comments/${commentId}/pin`, {
         method: "POST",
+        headers: {
+          "x-visitor-id": visitorId,
+        },
       });
       const result = await res.json();
       if (result.success) {
@@ -137,8 +141,12 @@ export default function CommentSection({
   const handleDelete = async (commentId: string) => {
     setDeletingIds((prev) => new Set(prev).add(commentId));
     try {
+      const visitorId = localStorage.getItem("visitor_id") || "";
       const res = await fetch(`/api/trace/${traceId}/comments/${commentId}`, {
         method: "DELETE",
+        headers: {
+          "x-visitor-id": visitorId,
+        },
       });
       const result = await res.json();
       if (result.success) {

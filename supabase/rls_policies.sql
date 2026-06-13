@@ -51,12 +51,17 @@ CREATE POLICY "comments_anon_insert"
   ON comments FOR INSERT
   WITH CHECK (true);
 
--- Only the comment author (matching visitor_id) can update/delete
+-- Only the comment author (matching visitor_id) or the trace owner (matching traces.visitor_id) can update/delete comments
 CREATE POLICY "comments_owner_update"
   ON comments FOR UPDATE
   USING (
     visitor_id IS NULL
     OR visitor_id = current_setting('request.headers', true)::json->>'x-visitor-id'
+    OR EXISTS (
+      SELECT 1 FROM traces
+      WHERE traces.id = comments.trace_id
+        AND (traces.visitor_id IS NULL OR traces.visitor_id = current_setting('request.headers', true)::json->>'x-visitor-id')
+    )
   );
 
 CREATE POLICY "comments_owner_delete"
@@ -64,22 +69,39 @@ CREATE POLICY "comments_owner_delete"
   USING (
     visitor_id IS NULL
     OR visitor_id = current_setting('request.headers', true)::json->>'x-visitor-id'
+    OR EXISTS (
+      SELECT 1 FROM traces
+      WHERE traces.id = comments.trace_id
+        AND (traces.visitor_id IS NULL OR traces.visitor_id = current_setting('request.headers', true)::json->>'x-visitor-id')
+    )
   );
 
 -- ── trace-media storage bucket ────────────────────────────────
--- NOTE: Storage policies are set via the Supabase dashboard UI
--- or using the storage API, not raw SQL.
+-- Since you are NOT using Supabase Auth, requests from the Next.js API
+-- routes run using the 'anon' role (via NEXT_PUBLIC_SUPABASE_ANON_KEY).
 --
--- In Supabase dashboard → Storage → trace-media → Policies:
+-- Therefore, the storage bucket policies must allow the 'public' (anon)
+-- role to INSERT and UPDATE (for upsert). If you restrict it to 'authenticated',
+-- uploads will fail.
 --
--- 1. SELECT (read): Allow for all  → everyone can read files (public bucket)
--- 2. INSERT (upload): Allow for authenticated role only
---    → Since you use the service/anon key server-side, this is fine.
---    → Prevents direct browser-side uploads bypassing your /api/upload route.
---
--- If you want to set this via SQL instead:
--- INSERT INTO storage.policies (name, bucket_id, operation, definition)
--- VALUES
---   ('trace-media-public-read', 'trace-media', 'SELECT', 'true'),
---   ('trace-media-server-insert', 'trace-media', 'INSERT', 'true');
--- (The bucket being PUBLIC already handles SELECT; focus on INSERT restriction)
+-- Note: You should enable Row Level Security (RLS) on storage.objects.
+-- This can be pasted directly in the Supabase SQL editor:
+
+-- Allow public read of files in trace-media
+CREATE POLICY "trace_media_public_read"
+  ON storage.objects FOR SELECT
+  TO public
+  USING (bucket_id = 'trace-media');
+
+-- Allow anon upload/insert of files to trace-media
+CREATE POLICY "trace_media_anon_insert"
+  ON storage.objects FOR INSERT
+  TO public
+  WITH CHECK (bucket_id = 'trace-media');
+
+-- Allow anon update/overwrite of files in trace-media
+CREATE POLICY "trace_media_anon_update"
+  ON storage.objects FOR UPDATE
+  TO public
+  USING (bucket_id = 'trace-media');
+

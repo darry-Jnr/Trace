@@ -195,13 +195,18 @@ const Main = () => {
     } catch (e) {
       console.error("LocalStorage rename error:", e);
     }
+    const visitorId = localStorage.getItem("visitor_id") || "";
     fetch(`/api/trace/${traceId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-visitor-id": visitorId,
+      },
       body: JSON.stringify({ title: newTitle }),
     }).catch((e) => console.error("Supabase rename error:", e));
     toast.success("Renamed", `Trace renamed to "${newTitle}".`);
   };
+
 
   const toggleSelectId = (id: string) => {
     setSelectedIds((prev) =>
@@ -273,7 +278,13 @@ const Main = () => {
 
         // Delete from Supabase
         try {
-          await fetch(`/api/trace/${trace.id}`, { method: "DELETE" });
+          const visitorId = localStorage.getItem("visitor_id") || "";
+          await fetch(`/api/trace/${trace.id}`, {
+            method: "DELETE",
+            headers: {
+              "x-visitor-id": visitorId,
+            },
+          });
         } catch (err) {
           console.error("Supabase deletion error:", err);
         }
