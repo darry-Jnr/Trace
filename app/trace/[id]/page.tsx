@@ -341,7 +341,10 @@ export default function TraceWorkspacePage() {
     progressCoords,
     unlockedWaypointIds,
     activeWaypoint: unlockedWaypoint,
+    syncPrompt,
+    skipPercent,
     startGuidance,
+    dismissSyncPrompt,
     dismissWaypoint,
     reset: resetGuidance,
   } = useReplayGuidance(
@@ -670,6 +673,10 @@ export default function TraceWorkspacePage() {
             distanceToStart={distanceToStart}
             trailProgress={trailProgress}
             activeWaypoint={replayActiveWaypoint}
+            syncPrompt={syncPrompt}
+            skipPercent={skipPercent}
+            onStartGuidance={startGuidance}
+            onDismissSyncPrompt={dismissSyncPrompt}
             onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}
             commentCount={commentCount}

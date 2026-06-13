@@ -35,12 +35,16 @@ export function useReplayGuidance(
   const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
   const [trailProgress, setTrailProgress] = useState(0);
   const [progressCoords, setProgressCoords] = useState<[number, number][]>([]);
+  const [syncPrompt, setSyncPrompt] = useState<"start" | "midpoint" | null>(null);
+  const [skipPercent, setSkipPercent] = useState(0);
 
   const syncedRef = useRef(false);
   const completedRef = useRef(false);
   const triggeredWpRef = useRef<Set<string>>(new Set());
   const lastLocationRef = useRef<[number, number] | null>(null);
   const processingRef = useRef(false);
+  const midTrailCheckedRef = useRef(false);
+  const promptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isReplayMode || !userLocation || trailCoordinates.length < 2) return;
@@ -64,9 +68,33 @@ export function useReplayGuidance(
     const dist = getDistance(userLocation, start);
     setDistanceToStart(dist);
 
+    // Priority 1: Start prompt — within 15m of trail start
     if (dist <= SYNC_THRESHOLD && !syncedRef.current) {
-      syncedRef.current = true;
-      setGuidanceState("following");
+      if (syncPrompt !== "start") {
+        setSyncPrompt("start");
+        if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+        promptTimerRef.current = setTimeout(() => {
+          startGuidance();
+        }, 5000);
+      }
+    } else if (dist > 20 && syncPrompt === "start") {
+      if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+      setSyncPrompt(null);
+    }
+
+    // Priority 2: Mid-trail detection — one-time on mount
+    if (!midTrailCheckedRef.current && !syncedRef.current && syncPrompt === null) {
+      let closest = 0;
+      let closestDist = Infinity;
+      for (let i = 0; i < trailCoordinates.length; i++) {
+        const d = getDistance(userLocation, trailCoordinates[i]);
+        if (d < closestDist) { closestDist = d; closest = i; }
+      }
+      if (closestDist <= 30 && dist > SYNC_THRESHOLD) {
+        setSyncPrompt("midpoint");
+        setSkipPercent(Math.round((closest / (trailCoordinates.length - 1)) * 100));
+      }
+      midTrailCheckedRef.current = true;
     }
 
     if (guidanceState === "following" || syncedRef.current) {
@@ -109,7 +137,15 @@ export function useReplayGuidance(
   }, [userLocation, isReplayMode, trailCoordinates, waypoints, guidanceState]);
 
   const startGuidance = useCallback(() => {
+    if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+    syncedRef.current = true;
+    setSyncPrompt(null);
     setGuidanceState("following");
+  }, []);
+
+  const dismissSyncPrompt = useCallback(() => {
+    if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+    setSyncPrompt(null);
   }, []);
 
   const dismissWaypoint = useCallback(() => {
@@ -120,12 +156,15 @@ export function useReplayGuidance(
     syncedRef.current = false;
     completedRef.current = false;
     triggeredWpRef.current = new Set();
+    midTrailCheckedRef.current = false;
     setGuidanceState("idle");
     setDistanceToStart(null);
     setUnlockedWaypointIds(new Set());
     setActiveWaypoint(null);
     setTrailProgress(0);
     setProgressCoords([]);
+    setSyncPrompt(null);
+    setSkipPercent(0);
   }, []);
 
   return {
@@ -135,7 +174,10 @@ export function useReplayGuidance(
     progressCoords,
     unlockedWaypointIds,
     activeWaypoint,
+    syncPrompt,
+    skipPercent,
     startGuidance,
+    dismissSyncPrompt,
     dismissWaypoint,
     reset,
   };

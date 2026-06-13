@@ -9,6 +9,10 @@ interface ReplayOverlayProps {
   distanceToStart: number | null;
   trailProgress: number;
   activeWaypoint: WaypointMedia | null;
+  syncPrompt: "start" | "midpoint" | null;
+  skipPercent: number;
+  onStartGuidance: () => void;
+  onDismissSyncPrompt: () => void;
   onDismissWaypoint: () => void;
   onBack: () => void;
   onCommentsClick: () => void;
@@ -26,6 +30,10 @@ export default function ReplayOverlay({
   distanceToStart,
   trailProgress,
   activeWaypoint,
+  syncPrompt,
+  skipPercent,
+  onStartGuidance,
+  onDismissSyncPrompt,
   onDismissWaypoint,
   onBack,
   onCommentsClick,
@@ -152,6 +160,62 @@ export default function ReplayOverlay({
                 <svg className="w-3.5 h-3.5 text-black/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <path d="M18 6L6 18" /><path d="M6 6l12 12" />
                 </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Start prompt — user arrives at trail start */}
+      {syncPrompt === "start" && (
+        <div className="absolute bottom-0 left-0 right-0 z-50 animate-slide-up-sheet">
+          <div className="mx-4 mb-6 p-5 rounded-[24px] bg-white/95 backdrop-blur-2xl border border-black/[0.04] shadow-[0_10px_40px_rgba(0,0,0,0.1)]">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#0052FF]/10 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-[#0052FF]" />
+              </div>
+              <div>
+                <p className="text-[15px] font-bold text-black tracking-tight">Trail start found</p>
+                <p className="text-[13px] text-black/50 font-medium">Follow this route?</p>
+              </div>
+            </div>
+            <button
+              onClick={onStartGuidance}
+              className="w-full h-11 rounded-xl bg-black text-white text-[14px] font-semibold active:scale-95 transition-transform"
+            >
+              Go
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Midpoint prompt — user joins the trail partway */}
+      {syncPrompt === "midpoint" && (
+        <div className="absolute bottom-0 left-0 right-0 z-50 animate-slide-up-sheet">
+          <div className="mx-4 mb-6 p-5 rounded-[24px] bg-white/95 backdrop-blur-2xl border border-black/[0.04] shadow-[0_10px_40px_rgba(0,0,0,0.1)]">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[15px] font-bold text-black tracking-tight">Joining partway</p>
+                <p className="text-[13px] text-black/50 font-medium">
+                  You&apos;re {skipPercent}% along this trail. Start tracing from here?
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <button
+                onClick={onDismissSyncPrompt}
+                className="flex-1 h-11 rounded-xl bg-black/[0.05] text-[13px] font-semibold text-black/60 active:scale-95 transition-transform"
+              >
+                Not now
+              </button>
+              <button
+                onClick={onStartGuidance}
+                className="flex-1 h-11 rounded-xl bg-black text-white text-[13px] font-semibold active:scale-95 transition-transform"
+              >
+                Start
               </button>
             </div>
           </div>
