@@ -28,6 +28,7 @@ export function useGPSTracker(
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<LoadingStage>("booting");
   const [hasGpsFix, setHasGpsFix] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState(0);
   const [gpsRetryCount, setGpsRetryCount] = useState(0);
 
   const retryGps = useCallback(() => {
@@ -116,6 +117,8 @@ export function useGPSTracker(
 
         if (accuracy > (isRecordingRef.current ? 25 : 100)) return;
 
+        setGpsAccuracy(accuracy);
+
         const finalCoords = kalmanFilterRef.current.update(
           [rawLng, rawLat],
           accuracy,
@@ -169,5 +172,5 @@ export function useGPSTracker(
     // so this effect runs exactly once and the watch is never torn down.
   }, [gpsRetryCount]);
 
-  return { baseLocation, userLocation, isLoading, loadingStage, hasGpsFix, retryGps };
+  return { baseLocation, userLocation, isLoading, loadingStage, hasGpsFix, gpsAccuracy, retryGps };
 }

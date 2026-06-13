@@ -18,7 +18,8 @@ export function useMapEngine(
   isFollowing: boolean = false,
   unlockedWaypointIds: Set<string> = new Set(),
   progressCoords: [number, number][] = [],
-  distanceToStart: number | null = null
+  distanceToStart: number | null = null,
+  gpsAccuracy: number = 0
 ) {
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -33,6 +34,7 @@ export function useMapEngine(
   const lastAutoZoomRef = useRef(0);
   const zoomModeRef = useRef<"far" | "near" | null>(null);
   const lastCenteredRef = useRef<[number, number] | null>(null);
+  const accuracyRef = useRef(gpsAccuracy);
 
   // Mount Instance Mapbox Canvas
   useEffect(() => {
@@ -92,6 +94,29 @@ export function useMapEngine(
             paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
           });
 
+          map.addSource("accuracy-circle-source", {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "Point", coordinates: baseLocation },
+            },
+          });
+
+          map.addLayer({
+            id: "accuracy-circle-layer",
+            type: "circle",
+            source: "accuracy-circle-source",
+            paint: {
+              "circle-color": "#0052FF",
+              "circle-opacity": 0.12,
+              "circle-radius": 0,
+              "circle-stroke-color": "#0052FF",
+              "circle-stroke-width": 1,
+              "circle-stroke-opacity": 0.3,
+            },
+          });
+
           // Retry replay visuals — map is now ready
           if (isReplayOnMount) addReplayVisuals();
         });
@@ -130,6 +155,7 @@ export function useMapEngine(
 
   const trailCoordsRef = useRef(trailCoordinates);
   useEffect(() => { trailCoordsRef.current = trailCoordinates; }, [trailCoordinates]);
+  useEffect(() => { accuracyRef.current = gpsAccuracy; }, [gpsAccuracy]);
   const baseLocRef = useRef(baseLocation);
   useEffect(() => { baseLocRef.current = baseLocation; }, [baseLocation]);
 
@@ -319,6 +345,22 @@ export function useMapEngine(
 
     userCoordsRef.current = coords;
     if (userMarkerRef.current) userMarkerRef.current.setLngLat(coords);
+
+    // Update accuracy circle
+    const accuracySource = map.getSource("accuracy-circle-source") as mapboxgl.GeoJSONSource;
+    if (accuracySource && accuracyRef.current > 0) {
+      accuracySource.setData({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "Point", coordinates: coords },
+      });
+
+      const zoom = map.getZoom();
+      const lat = coords[1];
+      const metersPerPx = 156543 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+      const radiusPx = accuracyRef.current / metersPerPx;
+      map.setPaintProperty("accuracy-circle-layer", "circle-radius", Math.min(radiusPx, 300));
+    }
 
     if (isReplayMode && isFollowing) {
       const targetBearing = heading !== null && heading !== undefined ? heading : map.getBearing();

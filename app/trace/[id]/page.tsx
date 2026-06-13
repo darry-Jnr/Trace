@@ -296,7 +296,7 @@ export default function TraceWorkspacePage() {
 
   // Engine Connection #2: Hardware device telemetry location tracking engine
   // Always runs — recording mode tracks path, replay mode tracks follower
-  const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, retryGps } = useGPSTracker(
+  const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, gpsAccuracy, retryGps } = useGPSTracker(
     isRecording,
     (coords: [number, number], heading: number | null) => {
       // eslint-disable-next-line react-hooks/immutability
@@ -388,7 +388,8 @@ export default function TraceWorkspacePage() {
     guidanceState === "following",
     unlockedWaypointIds,
     progressCoords,
-    distanceToStart
+    distanceToStart,
+    gpsAccuracy
   );
 
   // Simulator tick — advances simulatedIndex each frame at chosen speed
