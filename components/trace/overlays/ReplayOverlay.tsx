@@ -237,7 +237,7 @@ export default function ReplayOverlay({
       )}
 
       {/* ── IDLE STATE — Show "Play Walkthrough" if not simulating and not syncing ── */}
-      {!isSimulating && guidanceState === "idle" && syncPrompt === null && distanceToStart !== null && distanceToStart > 30 && (
+      {!isSimulating && guidanceState === "idle" && syncPrompt === null && (distanceToStart === null || distanceToStart > 30) && (
         <div className="absolute bottom-0 left-0 right-0 z-50 animate-slide-up-sheet">
           <div className="mx-4 mb-6 p-5 rounded-[24px] bg-white/95 backdrop-blur-2xl border border-black/[0.04] shadow-[0_10px_40px_rgba(0,0,0,0.1)]">
             <div className="flex items-center gap-3.5 mb-4">
@@ -348,12 +348,20 @@ export default function ReplayOverlay({
                 <p className="text-[13px] text-black/50 font-medium">Follow this route?</p>
               </div>
             </div>
-            <button
-              onClick={onStartGuidance}
-              className="w-full h-11 rounded-xl bg-black text-white text-[14px] font-semibold active:scale-95 transition-transform"
-            >
-              Go
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onStartSimulation}
+                className="flex-1 h-11 rounded-xl bg-black/[0.05] text-[13px] font-semibold text-black/60 active:scale-95 transition-transform"
+              >
+                Simulate
+              </button>
+              <button
+                onClick={onStartGuidance}
+                className="flex-1 h-11 rounded-xl bg-black text-white text-[13px] font-semibold active:scale-95 transition-transform"
+              >
+                Go
+              </button>
+            </div>
           </div>
         </div>
       )}
