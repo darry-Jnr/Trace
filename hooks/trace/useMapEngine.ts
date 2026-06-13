@@ -91,7 +91,7 @@ export function useMapEngine(
             type: "line",
             source: "recording-trail-source",
             layout: { "line-join": "round", "line-cap": "round" },
-            paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
+        paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
           });
 
           map.addSource("accuracy-circle-source", {
@@ -430,6 +430,7 @@ export function useMapEngine(
     if (!map) return null;
 
     const el = document.createElement("div");
+    el.style.touchAction = "manipulation";
     const count = group.items.length;
 
     if (count === 1) {
@@ -465,11 +466,14 @@ export function useMapEngine(
       el.innerHTML = html;
     }
 
-    el.addEventListener("click", (e) => {
+    const handleMarkerTap = (e: Event) => {
       e.stopPropagation();
       onGroupSelect(group);
       map.easeTo({ center: group.coordinates, duration: 600 });
-    });
+    };
+
+    el.addEventListener("click", handleMarkerTap);
+    el.addEventListener("touchend", handleMarkerTap);
 
     const marker = new mapboxglRef.current.Marker({ element: el }).setLngLat(group.coordinates).addTo(map);
     return marker;
