@@ -150,7 +150,7 @@ export function useMapEngine(
         type: "line",
         source: "ghost-trail-source",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.3 },
+        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.22 },
       });
 
       map.addSource("progress-trail-source", {
@@ -163,7 +163,7 @@ export function useMapEngine(
         type: "line",
         source: "progress-trail-source",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
+        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
       });
 
       const startEl = document.createElement("div");
@@ -234,10 +234,10 @@ export function useMapEngine(
     }
   }, [isReplayMode, trailCoordinates]);
 
-  // Update progress trail data (black covering)
+  // Update progress trail data (solid blue line growing as user/simulator advances)
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !isReplayMode || !isFollowing) return;
+    if (!map || !isReplayMode) return;
 
     const applyProgress = () => {
       const source = map.getSource("progress-trail-source") as mapboxgl.GeoJSONSource;
@@ -255,7 +255,7 @@ export function useMapEngine(
     } else {
       map.once("style.load", applyProgress);
     }
-  }, [isReplayMode, isFollowing, progressCoords]);
+  }, [isReplayMode, progressCoords]);
 
   // Update user marker appearance based on mode state
   useEffect(() => {
@@ -434,12 +434,23 @@ export function useMapEngine(
   };
 
   // Sync vector path trail to Mapbox source layer automatically on updates
+  // In replay mode, hide the recording layer (ghost/progress layers take over)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     const applyPath = () => {
-      updateVectorPath(trailCoordinates);
+      if (isReplayMode) {
+        // Hide the recording trail — ghost+progress layers show instead
+        if (map.getLayer("recording-trail-layer")) {
+          map.setLayoutProperty("recording-trail-layer", "visibility", "none");
+        }
+      } else {
+        if (map.getLayer("recording-trail-layer")) {
+          map.setLayoutProperty("recording-trail-layer", "visibility", "visible");
+        }
+        updateVectorPath(trailCoordinates);
+      }
     };
 
     if (map.isStyleLoaded()) {

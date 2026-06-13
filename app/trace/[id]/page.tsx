@@ -62,6 +62,14 @@ export default function TraceWorkspacePage() {
   const [traceDistance, setTraceDistance] = useState("0.0 mi");
   const [traceDate, setTraceDate] = useState("");
 
+  // Simulator states
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulatedIndex, setSimulatedIndex] = useState(0);
+  const [isSimPlay, setIsSimPlay] = useState(true);
+  const [simulationSpeed, setSimulationSpeed] = useState<1 | 3 | 10>(1);
+  const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const simulatedIndexRef = useRef(0);
+
   const [isSaving, setIsSaving] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<string>("");
   const [gpsTimedOut, setGpsTimedOut] = useState(false);
@@ -348,19 +356,11 @@ export default function TraceWorkspacePage() {
     dismissWaypoint,
     reset: resetGuidance,
   } = useReplayGuidance(
-    userLocation,
+    isSimulating ? (trailCoordinates[simulatedIndex] ?? userLocation) : userLocation,
     trailCoordinates,
     savedMedia,
     isReplayMode
   );
-
-  // In replay mode, use unlocked waypoint from guidance OR manually tapped one
-  const replayActiveWaypoint = unlockedWaypoint || activeWaypoint;
-  const handleDismissWaypoint = useCallback(() => {
-    dismissWaypoint();
-    setActiveWaypoint(null);
-    setActiveGroupItems([]);
-  }, [dismissWaypoint]);
 
   // Engine Connection #1: Mapbox canvas lifecycle engine
   const {
@@ -390,6 +390,86 @@ export default function TraceWorkspacePage() {
     progressCoords,
     distanceToStart
   );
+
+  // Simulator tick — advances simulatedIndex each frame at chosen speed
+  useEffect(() => {
+    if (!isSimulating) return;
+
+    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+
+    if (!isSimPlay) return;
+
+    // Step size: how many coord indices to advance per tick
+    // 1x → 1 step/200ms; 3x → 3 steps/200ms; 10x → 10 steps/200ms
+    const TICK_MS = 200;
+    simIntervalRef.current = setInterval(() => {
+      const total = trailCoordinates.length;
+      if (total < 2) return;
+
+      const next = simulatedIndexRef.current + simulationSpeed;
+      if (next >= total - 1) {
+        simulatedIndexRef.current = total - 1;
+        setSimulatedIndex(total - 1);
+        setIsSimPlay(false);
+        if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+        return;
+      }
+
+      simulatedIndexRef.current = next;
+      setSimulatedIndex(next);
+
+      // Drive the map camera to follow the simulated marker
+      handleLocationStream(trailCoordinates[next], null);
+    }, TICK_MS);
+
+    return () => {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    };
+  }, [isSimulating, isSimPlay, simulationSpeed, trailCoordinates, handleLocationStream]);
+
+  const handleStartSimulation = useCallback(() => {
+    if (trailCoordinates.length < 2) return;
+    simulatedIndexRef.current = 0;
+    setSimulatedIndex(0);
+    setIsSimPlay(true);
+    setIsSimulating(true);
+    // Engage guidance so progress trail starts painting
+    startGuidance();
+    // Jump map to start of trail
+    centerOnCoords(trailCoordinates[0]);
+  }, [trailCoordinates, startGuidance, centerOnCoords]);
+
+  const handleStopSimulation = useCallback(() => {
+    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    setIsSimulating(false);
+    setIsSimPlay(false);
+    simulatedIndexRef.current = 0;
+    setSimulatedIndex(0);
+    resetGuidance();
+  }, [resetGuidance]);
+
+  const handleSeekSimulation = useCallback((percent: number) => {
+    const total = trailCoordinates.length;
+    if (total < 2) return;
+    const idx = Math.round((percent / 100) * (total - 1));
+    simulatedIndexRef.current = idx;
+    setSimulatedIndex(idx);
+    handleLocationStream(trailCoordinates[idx], null);
+  }, [trailCoordinates, handleLocationStream]);
+
+  // Derived simulation progress (0–100)
+  const simulationProgress = trailCoordinates.length > 1
+    ? Math.round((simulatedIndex / (trailCoordinates.length - 1)) * 100)
+    : 0;
+
+  // In replay mode, use unlocked waypoint from guidance OR manually tapped one
+  const replayActiveWaypoint = unlockedWaypoint || activeWaypoint;
+  const handleDismissWaypoint = useCallback(() => {
+    dismissWaypoint();
+    setActiveWaypoint(null);
+    setActiveGroupItems([]);
+  }, [dismissWaypoint]);
+
 
 
 
@@ -716,6 +796,15 @@ export default function TraceWorkspacePage() {
                 setShowNameModal(true);
               }
             }}
+            isSimulating={isSimulating}
+            isSimPlay={isSimPlay}
+            simulationSpeed={simulationSpeed}
+            simulationProgress={simulationProgress}
+            onStartSimulation={handleStartSimulation}
+            onStopSimulation={handleStopSimulation}
+            onToggleSimPlay={() => setIsSimPlay((p) => !p)}
+            onChangeSimSpeed={(s) => setSimulationSpeed(s)}
+            onSeekSimulation={handleSeekSimulation}
           />
         )}
 
