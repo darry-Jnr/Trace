@@ -1,3 +1,5 @@
+import { chaikinSmooth } from "@/hooks/trace/chaikinSmooth";
+
 const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 const MATCHING_API = "https://api.mapbox.com/matching/v5/mapbox/walking";
 
@@ -24,13 +26,14 @@ export async function snapToRoads(
         const snapped = data.matchings[0].geometry.coordinates as [number, number][];
         allSnapped.push(...snapped);
       } else {
-        allSnapped.push(...batch);
+        allSnapped.push(...chaikinSmooth(batch));
       }
     } catch (e) {
       console.error("Map Matching API failed:", e);
-      allSnapped.push(...batch);
+      allSnapped.push(...chaikinSmooth(batch));
     }
   }
 
   return allSnapped;
 }
+
