@@ -430,6 +430,18 @@ export default function TraceWorkspacePage() {
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
     (window as any).pendo?.track('Moment Added', { type: 'voice', duration: durationSec, traceId: id });
+
+    // Immediately upload in the background — upgrades blob URL to permanent Supabase URL
+    const file = new File([audioBlob], `voice-${wpId}.webm`, { type: "audio/webm" });
+    uploadFile(file, id, wpId).then((url) => {
+      if (url) {
+        pendingMediaRef.current.delete(wpId); // already uploaded — no need to re-upload at save
+        URL.revokeObjectURL(blobUrl);
+        setSavedMedia((prev) =>
+          prev.map((m) => (m.id === wpId ? { ...m, fileUrl: url } : m))
+        );
+      }
+    });
   };
 
   const handleSavePhotoMarker = (imageDataUrl: string) => {
@@ -437,7 +449,8 @@ export default function TraceWorkspacePage() {
     const wpId = `wp-${Date.now()}`;
     pendingMediaRef.current.set(wpId, imageDataUrl);
     // Convert data URL to blob URL for preview (avoids storing large base64 in state/localStorage)
-    const blobUrl = URL.createObjectURL(dataURLToBlob(imageDataUrl));
+    const imageBlob = dataURLToBlob(imageDataUrl);
+    const blobUrl = URL.createObjectURL(imageBlob);
     const newMedia: WaypointMedia = {
       id: wpId,
       type: "image",
@@ -449,6 +462,18 @@ export default function TraceWorkspacePage() {
     setSavedMedia((prev) => [...prev, newMedia]);
     setIsAddMenuOpen(false);
     (window as any).pendo?.track('Moment Added', { type: 'image', traceId: id });
+
+    // Immediately upload in the background — upgrades blob URL to permanent Supabase URL
+    const file = new File([imageBlob], `photo-${wpId}.jpg`, { type: "image/jpeg" });
+    uploadFile(file, id, wpId).then((url) => {
+      if (url) {
+        pendingMediaRef.current.delete(wpId); // already uploaded — no need to re-upload at save
+        URL.revokeObjectURL(blobUrl);
+        setSavedMedia((prev) =>
+          prev.map((m) => (m.id === wpId ? { ...m, fileUrl: url } : m))
+        );
+      }
+    });
   };
 
   const getNextUntitledTitle = () => {
@@ -551,11 +576,12 @@ export default function TraceWorkspacePage() {
     };
 
     // 2. Save to Supabase database
+    const visitorId = localStorage.getItem("visitor_id") || undefined;
     try {
       const res = await fetch("/api/trace", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newTrace),
+        body: JSON.stringify({ ...newTrace, visitor_id: visitorId }),
       });
 
       if (!res.ok) {

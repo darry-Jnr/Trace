@@ -52,11 +52,12 @@ const Main = () => {
     async function fetchTraces() {
       const stored = localStorage.getItem("saved_traces");
       const recentRaw = localStorage.getItem("recently_viewed");
+      const visitorId = localStorage.getItem("visitor_id");
 
       let owned: TraceItem[] = [];
       let shared: TraceItem[] = [];
 
-      // Parse owned traces
+      // Parse owned traces from localStorage
       if (stored) {
         try {
           const localTraces = JSON.parse(stored) as { id: string; title: string; link: string; date: string; distance?: string }[];
@@ -92,7 +93,49 @@ const Main = () => {
         }
       }
 
-      // Parse recently viewed (shared traces)
+      // Recover ownership from Supabase by visitor_id
+      // Fills the gap if localStorage was cleared but traces still exist server-side
+      if (visitorId) {
+        try {
+          const res = await fetch(`/api/trace/mine?visitor_id=${encodeURIComponent(visitorId)}`);
+          if (res.ok) {
+            const result = await res.json();
+            if (result.success && Array.isArray(result.data)) {
+              const ownedIds = new Set(owned.map((t) => t.id));
+              const recovered = result.data
+                .filter((t: any) => !ownedIds.has(t.id))
+                .map((t: any) => ({
+                  id: t.id,
+                  title: t.title,
+                  link: `${window.location.origin}/trace/${t.id}`,
+                  date: t.date,
+                  distance: t.distance,
+                  isOwner: true,
+                }));
+
+              // Also re-sync recovered traces back to localStorage
+              if (recovered.length > 0) {
+                try {
+                  const existing = JSON.parse(localStorage.getItem("saved_traces") || "[]");
+                  const existingIds = new Set(existing.map((t: any) => t.id));
+                  const toAdd = recovered.filter((t: TraceItem) => !existingIds.has(t.id));
+                  if (toAdd.length > 0) {
+                    localStorage.setItem(
+                      "saved_traces",
+                      JSON.stringify([...toAdd, ...existing])
+                    );
+                  }
+                } catch {}
+                owned = [...owned, ...recovered];
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed recovering traces from Supabase:", e);
+        }
+      }
+
+      // Parse recently viewed (shared traces — traces you opened via someone else's link)
       if (recentRaw) {
         try {
           const parsed = JSON.parse(recentRaw) as { id: string; title: string; date: string; distance?: string }[];

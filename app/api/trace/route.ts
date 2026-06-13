@@ -5,7 +5,7 @@ export async function POST(request: Request) {
   const supabase = getSupabaseClient();
   try {
     const body = await request.json();
-    const { id, title, link, coordinates, waypoints, distance, date } = body;
+    const { id, title, link, coordinates, waypoints, distance, date, visitor_id } = body;
 
     if (!id || !title || !date) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -21,6 +21,7 @@ export async function POST(request: Request) {
         waypoints,
         distance,
         date,
+        ...(visitor_id ? { visitor_id } : {}),
       })
       .select();
 
