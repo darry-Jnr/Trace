@@ -354,6 +354,7 @@ export default function TraceWorkspacePage() {
     startGuidance,
     dismissSyncPrompt,
     dismissWaypoint,
+    checkWaypointsAt,
     reset: resetGuidance,
   } = useReplayGuidance(
     isSimulating ? (trailCoordinates[simulatedIndex] ?? userLocation) : userLocation,
@@ -456,7 +457,8 @@ export default function TraceWorkspacePage() {
     simulatedIndexRef.current = idx;
     setSimulatedIndex(idx);
     handleLocationStream(trailCoordinates[idx], null);
-  }, [trailCoordinates, handleLocationStream]);
+    checkWaypointsAt(trailCoordinates[idx]);
+  }, [trailCoordinates, handleLocationStream, checkWaypointsAt]);
 
   // Derived simulation progress (0–100)
   const simulationProgress = trailCoordinates.length > 1

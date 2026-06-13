@@ -236,27 +236,16 @@ export default function ReplayOverlay({
         </div>
       )}
 
-      {/* ── IDLE STATE — Show "Play Walkthrough" if not simulating and not syncing ── */}
+      {/* ── IDLE STATE — Small floating walkthrough button ── */}
       {!isSimulating && guidanceState === "idle" && syncPrompt === null && (distanceToStart === null || distanceToStart > 30) && (
-        <div className="absolute bottom-0 left-0 right-0 z-50 animate-slide-up-sheet">
-          <div className="mx-4 mb-6 p-5 rounded-[24px] bg-white/95 backdrop-blur-2xl border border-black/[0.04] shadow-[0_10px_40px_rgba(0,0,0,0.1)]">
-            <div className="flex items-center gap-3.5 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#0052FF]/10 flex items-center justify-center shrink-0">
-                <Play className="w-5 h-5 text-[#0052FF] fill-[#0052FF] ml-0.5" />
-              </div>
-              <div>
-                <p className="text-[15px] font-bold text-black tracking-tight">Virtual Walkthrough</p>
-                <p className="text-[12px] text-black/50 font-medium">Simulate the full route from anywhere</p>
-              </div>
-            </div>
-            <button
-              onClick={onStartSimulation}
-              className="w-full h-11 rounded-xl bg-[#0052FF] text-white text-[14px] font-semibold active:scale-95 transition-transform shadow-[0_4px_20px_rgba(0,82,255,0.25)]"
-            >
-              Play Walkthrough
-            </button>
-          </div>
-        </div>
+        <button
+          onClick={onStartSimulation}
+          className="absolute bottom-5 left-1/2 -translate-x-1/2 z-40 h-10 px-4 rounded-xl bg-white/80 backdrop-blur-2xl border border-black/[0.05] shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex items-center gap-2 active:scale-90 transition-all duration-200 hover:bg-white"
+          title="Virtual walkthrough"
+        >
+          <Play className="w-4 h-4 text-[#0052FF] fill-[#0052FF]" />
+          <span className="text-[13px] font-semibold text-black/70">Walkthrough</span>
+        </button>
       )}
 
       {/* Waypoint content sheet — bottom when waypoint is active */}

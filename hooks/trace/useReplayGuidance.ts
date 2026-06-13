@@ -54,21 +54,12 @@ export function useReplayGuidance(
     processingRef.current = true;
     const release = () => { processingRef.current = false; };
 
-    // Skip if user hasn't moved significantly (>5m) since last check
-    if (lastLocationRef.current) {
-      const moved = getDistance(lastLocationRef.current, userLocation);
-      if (moved < 5) {
-        release();
-        return;
-      }
-    }
-    lastLocationRef.current = userLocation;
-
     const start = trailCoordinates[0];
     const dist = getDistance(userLocation, start);
     setDistanceToStart(dist);
 
     // Priority 1: Start prompt — within 15m of trail start
+    // Runs before movement throttle so it triggers even when standing still
     if (dist <= SYNC_THRESHOLD && !syncedRef.current) {
       if (syncPrompt !== "start") {
         setSyncPrompt("start");
@@ -97,7 +88,25 @@ export function useReplayGuidance(
       midTrailCheckedRef.current = true;
     }
 
-    if (guidanceState === "following" || syncedRef.current) {
+    // Auto-dismiss midpoint prompt if user walks >30m from the trail
+    if (syncPrompt === "midpoint") {
+      let minDist = Infinity;
+      for (let i = 0; i < trailCoordinates.length; i++) {
+        const d = getDistance(userLocation, trailCoordinates[i]);
+        if (d < minDist) minDist = d;
+      }
+      if (minDist > 30) {
+        setSyncPrompt(null);
+      }
+    }
+
+    // Movement throttle — only gate guidance-following logic, not prompt detection
+    const hasMoved = lastLocationRef.current
+      ? getDistance(lastLocationRef.current, userLocation) >= 5
+      : true;
+    lastLocationRef.current = userLocation;
+
+    if ((guidanceState === "following" || syncedRef.current) && hasMoved) {
       for (const wp of waypoints) {
         if (!triggeredWpRef.current.has(wp.id)) {
           const wpDist = getDistance(userLocation, wp.coordinates);
@@ -152,6 +161,19 @@ export function useReplayGuidance(
     setActiveWaypoint(null);
   }, []);
 
+  const checkWaypointsAt = useCallback((coords: [number, number]) => {
+    for (const wp of waypoints) {
+      if (!triggeredWpRef.current.has(wp.id)) {
+        const wpDist = getDistance(coords, wp.coordinates);
+        if (wpDist <= WAYPOINT_UNLOCK_THRESHOLD) {
+          triggeredWpRef.current.add(wp.id);
+          setUnlockedWaypointIds((prev) => new Set(prev).add(wp.id));
+          setActiveWaypoint(wp);
+        }
+      }
+    }
+  }, [waypoints]);
+
   const reset = useCallback(() => {
     syncedRef.current = false;
     completedRef.current = false;
@@ -179,6 +201,7 @@ export function useReplayGuidance(
     startGuidance,
     dismissSyncPrompt,
     dismissWaypoint,
+    checkWaypointsAt,
     reset,
   };
 }

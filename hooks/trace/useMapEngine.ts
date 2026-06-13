@@ -271,7 +271,7 @@ export function useMapEngine(
         source.setData({
           type: "Feature",
           properties: {},
-          geometry: { type: "LineString", coordinates: chaikinSmooth(progressCoords) },
+          geometry: { type: "LineString", coordinates: progressCoords },
         });
       }
     };
