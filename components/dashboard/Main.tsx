@@ -177,11 +177,13 @@ const Main = () => {
   const ownerTraceIds = useMemo(() => new Set(myTraces.filter((t) => t.isOwner).map((t) => t.id)), [myTraces]);
 
   const handleNewTrace = () => {
+    (window as any).pendo?.track('New Trace From Dashboard', { existingTraceCount: myTraces.length });
     const newId = Math.random().toString(36).substring(2, 9);
     router.push(`/trace/${newId}`);
   };
 
   const handleRenameTrace = (traceId: string, newTitle: string) => {
+    (window as any).pendo?.track('Trace Renamed', { traceId, newTitle });
     setMyTraces((prev) => prev.map((t) => t.id === traceId ? { ...t, title: newTitle } : t));
     try {
       const stored = localStorage.getItem("saved_traces");
@@ -227,6 +229,7 @@ const Main = () => {
 
   const handleDeleteTraces = (idsToDelete: string[]) => {
     if (idsToDelete.length === 0) return;
+    (window as any).pendo?.track('Trace Deleted', { traceCount: idsToDelete.length, traceIds: idsToDelete.join(',') });
 
     // Save traces for potential undo
     const tracesToDelete = myTraces.filter((t) => idsToDelete.includes(t.id));
@@ -397,6 +400,7 @@ const Main = () => {
                       onRename={(newTitle) => isOwnerSelected && handleRenameTrace(trace.id, newTitle)}
                       onShare={() => {
                         navigator.clipboard.writeText(trace.link);
+                        (window as any).pendo?.track('Trace Link Copied', { traceId: trace.id, traceTitle: trace.title });
                         toast.success("Link Copied", "Trace link copied to clipboard.");
                       }}
                       onClick={() => router.push(`/trace/${trace.id}`)}

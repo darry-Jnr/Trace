@@ -34,12 +34,14 @@ export default function NameModal({
   const handleContinue = () => {
     const finalName = name.trim() || generateGuestName();
     localStorage.setItem("visitor_name", finalName);
+    (window as any).pendo?.track('Visitor Name Set', { nameProvided: !!name.trim(), wasSkipped: false });
     onComplete(finalName);
   };
 
   const handleSkip = () => {
     const guestName = generateGuestName();
     localStorage.setItem("visitor_name", guestName);
+    (window as any).pendo?.track('Visitor Name Set', { nameProvided: false, wasSkipped: true });
     onComplete(guestName);
   };
 

@@ -27,7 +27,8 @@ export function useReplayGuidance(
   userLocation: [number, number] | null,
   trailCoordinates: [number, number][],
   waypoints: WaypointMedia[],
-  isReplayMode: boolean
+  isReplayMode: boolean,
+  traceId?: string
 ) {
   const [guidanceState, setGuidanceState] = useState<"idle" | "synced" | "following" | "complete">("idle");
   const [distanceToStart, setDistanceToStart] = useState<number | null>(null);
@@ -124,6 +125,7 @@ export function useReplayGuidance(
       if (endDist <= COMPLETION_THRESHOLD && !completedRef.current) {
         completedRef.current = true;
         setGuidanceState("complete");
+        (window as any).pendo?.track('Replay Completed', { traceId, trailProgress: Math.round((closestIdx / (trailCoordinates.length - 1)) * 100) });
       }
 
       // Only update progress state if significantly changed (avoid setState on every tick)
@@ -141,7 +143,8 @@ export function useReplayGuidance(
     syncedRef.current = true;
     setSyncPrompt(null);
     setGuidanceState("following");
-  }, []);
+    (window as any).pendo?.track('Replay Guidance Started', { traceId });
+  }, [traceId]);
 
   const dismissSyncPrompt = useCallback(() => {
     if (promptTimerRef.current) clearTimeout(promptTimerRef.current);

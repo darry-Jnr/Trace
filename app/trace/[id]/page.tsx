@@ -359,7 +359,8 @@ export default function TraceWorkspacePage() {
     isSimulating ? (trailCoordinates[simulatedIndex] ?? userLocation) : userLocation,
     trailCoordinates,
     savedMedia,
-    isReplayMode
+    isReplayMode,
+    id
   );
 
   // Engine Connection #1: Mapbox canvas lifecycle engine
@@ -411,6 +412,7 @@ export default function TraceWorkspacePage() {
         simulatedIndexRef.current = total - 1;
         setSimulatedIndex(total - 1);
         setIsSimPlay(false);
+        (window as any).pendo?.track('Simulation Completed', { traceId: id, simulationSpeed });
         if (simIntervalRef.current) clearInterval(simIntervalRef.current);
         return;
       }
@@ -433,11 +435,12 @@ export default function TraceWorkspacePage() {
     setSimulatedIndex(0);
     setIsSimPlay(true);
     setIsSimulating(true);
+    (window as any).pendo?.track('Simulation Started', { traceId: id, coordinateCount: trailCoordinates.length, waypointCount: savedMedia.length });
     // Engage guidance so progress trail starts painting
     startGuidance();
     // Jump map to start of trail
     centerOnCoords(trailCoordinates[0]);
-  }, [trailCoordinates, startGuidance, centerOnCoords]);
+  }, [trailCoordinates, startGuidance, centerOnCoords, id, savedMedia.length]);
 
   const handleStopSimulation = useCallback(() => {
     if (simIntervalRef.current) clearInterval(simIntervalRef.current);
@@ -569,6 +572,7 @@ export default function TraceWorkspacePage() {
 
   const handleToggleRecord = () => {
     if (isRecording) {
+      (window as any).pendo?.track('Recording Stopped', { traceId: id, waypointCount: savedMedia.length, distance: traceDistance });
       setIsRecording(false);
       setTraceTitleInput(getNextUntitledTitle());
       setTrailCoordinates(trailCoordsRef.current);
@@ -589,6 +593,7 @@ export default function TraceWorkspacePage() {
       setIsRecording(true);
       setIsAddMenuOpen(false);
       setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
+      (window as any).pendo?.track('Recording Started', { traceId: id, hasGpsFix });
     }
   };
 
@@ -709,6 +714,7 @@ export default function TraceWorkspacePage() {
   };
 
   const handleDiscardTrace = () => {
+    (window as any).pendo?.track('Trace Discarded', { traceId: id, waypointCount: savedMedia.length, distance: traceDistance });
     setShowSaveReview(false);
     setTrailCoordinates([]);
     trailCoordsRef.current = [];
