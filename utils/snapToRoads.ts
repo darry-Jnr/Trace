@@ -23,7 +23,7 @@ export async function snapToRoads(
     const batch = coords.slice(i, end);
     const coordStr = batch.map((c) => `${c[0]},${c[1]}`).join(";");
 
-    const url = `${MATCHING_API}/${coordStr}?geometries=geojson&overview=full&tidy=true&access_token=${MAPBOX_ACCESS_TOKEN}`;
+    const url = `${MATCHING_API}/${coordStr}?geometries=geojson&overview=full&access_token=${MAPBOX_ACCESS_TOKEN}`;
 
     try {
       const res = await fetch(url);
