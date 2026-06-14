@@ -65,6 +65,16 @@ export function useGPSTracker(
     onPathAppendRef.current = onPathAppend;
   }, [onPathAppend]);
 
+  // Start recording immediately seeding with current userLocation if empty
+  useEffect(() => {
+    if (isRecording) {
+      if (pathCoordsRef.current.length === 0 && userLocation) {
+        pathCoordsRef.current = [userLocation];
+        onPathAppendRef.current(pathCoordsRef.current);
+      }
+    }
+  }, [isRecording, userLocation]);
+
   // Bootstrap Position — get initial location from cache or IP
   useEffect(() => {
     async function prepareMap() {
@@ -120,7 +130,7 @@ export function useGPSTracker(
         const accuracy = position.coords.accuracy;
         const heading = position.coords.heading;
 
-        if (accuracy > (isRecordingRef.current ? 25 : 100)) return;
+        if (accuracy > (isRecordingRef.current ? 45 : 100)) return;
 
         setGpsAccuracy(accuracy);
 
