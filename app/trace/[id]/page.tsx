@@ -382,7 +382,6 @@ export default function TraceWorkspacePage() {
     guidanceState === "following",
     unlockedWaypointIds,
     progressCoords,
-    distanceToStart,
     gpsAccuracy
   );
 
