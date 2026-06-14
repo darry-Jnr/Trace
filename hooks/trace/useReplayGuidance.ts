@@ -27,7 +27,8 @@ export function useReplayGuidance(
   userLocation: [number, number] | null,
   trailCoordinates: [number, number][],
   waypoints: WaypointMedia[],
-  isReplayMode: boolean
+  isReplayMode: boolean,
+  traceId?: string
 ) {
   const [guidanceState, setGuidanceState] = useState<"idle" | "synced" | "following" | "complete">("idle");
   const [distanceToStart, setDistanceToStart] = useState<number | null>(null);
@@ -45,6 +46,10 @@ export function useReplayGuidance(
   const processingRef = useRef(false);
   const midTrailCheckedRef = useRef(false);
   const promptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentSyncPromptRef = useRef<"start" | "midpoint" | null>(null);
+  currentSyncPromptRef.current = syncPrompt;
+  const currentSkipPercentRef = useRef(0);
+  currentSkipPercentRef.current = skipPercent;
 
   useEffect(() => {
     if (!isReplayMode || !userLocation || trailCoordinates.length < 2) return;
@@ -133,6 +138,8 @@ export function useReplayGuidance(
       if (endDist <= COMPLETION_THRESHOLD && !completedRef.current) {
         completedRef.current = true;
         setGuidanceState("complete");
+        const completionProgress = Math.round((closestIdx / (trailCoordinates.length - 1)) * 100);
+        (window as any).pendo?.track('Replay Completed', { traceId, trailProgress: completionProgress, waypointsUnlocked: triggeredWpRef.current.size, totalWaypoints: waypoints.length });
       }
 
       // Only update progress state if significantly changed (avoid setState on every tick)
@@ -147,10 +154,12 @@ export function useReplayGuidance(
 
   const startGuidance = useCallback(() => {
     if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+    const joinType = currentSyncPromptRef.current === "midpoint" ? "midpoint" : "start";
+    (window as any).pendo?.track('Replay Guidance Started', { traceId, joinType, skipPercent: joinType === "midpoint" ? currentSkipPercentRef.current : 0 });
     syncedRef.current = true;
     setSyncPrompt(null);
     setGuidanceState("following");
-  }, []);
+  }, [traceId]);
 
   const dismissSyncPrompt = useCallback(() => {
     if (promptTimerRef.current) clearTimeout(promptTimerRef.current);

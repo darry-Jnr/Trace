@@ -102,6 +102,7 @@ export default function CommentSection({
         setComments((prev) => [...prev, result.data]);
         setInput("");
         onCommentPosted?.();
+        (window as any).pendo?.track('Comment Posted', { traceId, authorName: visitorName, contentLength: text.length, isAuthor, commentCount: comments.length + 1 });
         setTimeout(() => {
           listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
         }, 100);
@@ -125,11 +126,14 @@ export default function CommentSection({
       });
       const result = await res.json();
       if (result.success) {
+        const comment = comments.find((c) => c.id === commentId);
+        const action = comment?.is_pinned ? "unpinned" : "pinned";
         setComments((prev) =>
           prev.map((c) =>
             c.id === commentId ? { ...c, is_pinned: !c.is_pinned } : c
           )
         );
+        (window as any).pendo?.track('Comment Pinned', { traceId, commentId, action });
       } else {
         toast.error("Failed to pin", result.error || "Something went wrong");
       }
@@ -151,6 +155,7 @@ export default function CommentSection({
       const result = await res.json();
       if (result.success) {
         setComments((prev) => prev.filter((c) => c.id !== commentId));
+        (window as any).pendo?.track('Comment Deleted', { traceId, commentId });
       } else {
         toast.error("Failed to delete", result.error || "Something went wrong");
       }

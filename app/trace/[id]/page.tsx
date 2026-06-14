@@ -352,7 +352,8 @@ export default function TraceWorkspacePage() {
     userLocation,
     trailCoordinates,
     savedMedia,
-    isReplayMode
+    isReplayMode,
+    id
   );
 
   // Engine Connection #1: Mapbox canvas lifecycle engine
@@ -500,6 +501,7 @@ export default function TraceWorkspacePage() {
       setTraceTitleInput(getNextUntitledTitle());
       setTrailCoordinates(trailCoordsRef.current);
       updateVectorPath(trailCoordsRef.current);
+      (window as any).pendo?.track('Recording Stopped', { traceId: id, distance: traceDistance, coordinateCount: trailCoordsRef.current.length, waypointCount: savedMedia.length });
 
       setIsPolishing(true);
       snapToRoads(trailCoordsRef.current).then((snapped) => {
@@ -526,6 +528,7 @@ export default function TraceWorkspacePage() {
       setIsRecording(true);
       setIsAddMenuOpen(false);
       setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
+      (window as any).pendo?.track('Recording Started', { traceId: id, hasGpsFix, gpsAccuracy });
     }
   };
 
@@ -646,6 +649,7 @@ export default function TraceWorkspacePage() {
   };
 
   const handleDiscardTrace = () => {
+    (window as any).pendo?.track('Trace Discarded', { traceId: id, distance: traceDistance, waypointCount: savedMedia.length });
     setShowSaveReview(false);
     setTrailCoordinates([]);
     trailCoordsRef.current = [];
@@ -723,7 +727,7 @@ export default function TraceWorkspacePage() {
             onDismissWaypoint={handleDismissWaypoint}
             onBack={() => router.push("/dashboard")}
             commentCount={commentCount}
-            onRetrace={() => resetGuidance()}
+            onRetrace={() => { (window as any).pendo?.track('Replay Retrace Started', { traceId: id }); resetGuidance(); }}
             onCommentsClick={() => {
               const storedName = localStorage.getItem("visitor_name");
               if (storedName) {
