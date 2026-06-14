@@ -8,14 +8,22 @@ export async function snapToRoads(
 ): Promise<[number, number][]> {
   if (coords.length < 2) return coords;
 
+  if (!MAPBOX_ACCESS_TOKEN) {
+    console.warn("snapToRoads: Missing NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN — falling back to Chaikin smoothing");
+    return chaikinSmooth(coords);
+  }
+
   const batchSize = 100;
+  const overlap = 1;
+  const step = batchSize - overlap;
   const allSnapped: [number, number][] = [];
 
-  for (let i = 0; i < coords.length; i += batchSize) {
-    const batch = coords.slice(i, i + batchSize);
+  for (let i = 0; i < coords.length; i += step) {
+    const end = Math.min(i + batchSize, coords.length);
+    const batch = coords.slice(i, end);
     const coordStr = batch.map((c) => `${c[0]},${c[1]}`).join(";");
 
-    const url = `${MATCHING_API}/${coordStr}?geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
+    const url = `${MATCHING_API}/${coordStr}?geometries=geojson&overview=full&tidy=true&access_token=${MAPBOX_ACCESS_TOKEN}`;
 
     try {
       const res = await fetch(url);
@@ -24,7 +32,11 @@ export async function snapToRoads(
 
       if (data.matchings && data.matchings.length > 0) {
         const snapped = data.matchings[0].geometry.coordinates as [number, number][];
-        allSnapped.push(...snapped);
+        if (i > 0 && snapped.length > 1) {
+          allSnapped.push(...snapped.slice(1));
+        } else {
+          allSnapped.push(...snapped);
+        }
       } else {
         allSnapped.push(...chaikinSmooth(batch));
       }

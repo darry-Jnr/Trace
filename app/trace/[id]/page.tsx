@@ -71,6 +71,7 @@ export default function TraceWorkspacePage() {
   const trailCoordsRef = useRef<[number, number][]>([]);
   const totalDistanceRef = useRef(0);
   const lastCoordRef = useRef<[number, number] | null>(null);
+  const isStoppingRef = useRef(false);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -288,7 +289,7 @@ export default function TraceWorkspacePage() {
 
   // Engine Connection #2: Hardware device telemetry location tracking engine
   // Always runs — recording mode tracks path, replay mode tracks follower
-  const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, gpsAccuracy, retryGps } = useGPSTracker(
+  const { baseLocation, userLocation, isLoading: gpsLoading, loadingStage, hasGpsFix, gpsAccuracy, retryGps, resetRecording } = useGPSTracker(
     isRecording,
     (coords: [number, number], heading: number | null) => {
       // eslint-disable-next-line react-hooks/immutability
@@ -491,7 +492,11 @@ export default function TraceWorkspacePage() {
 
   const handleToggleRecord = () => {
     if (isRecording) {
+      if (isStoppingRef.current) return;
+      isStoppingRef.current = true;
+
       setIsRecording(false);
+      setIsAddMenuOpen(false);
       setTraceTitleInput(getNextUntitledTitle());
       setTrailCoordinates(trailCoordsRef.current);
       updateVectorPath(trailCoordsRef.current);
@@ -500,14 +505,24 @@ export default function TraceWorkspacePage() {
       snapToRoads(trailCoordsRef.current).then((snapped) => {
         setTrailCoordinates(snapped);
         updateVectorPath(snapped);
+        setTraceDistance(formatDistance(snapped));
         setIsPolishing(false);
         setShowPolishedMap(true);
         setTimeout(() => {
           setShowPolishedMap(false);
           setShowSaveReview(true);
+          isStoppingRef.current = false;
         }, 800);
+      }).catch(() => {
+        isStoppingRef.current = false;
       });
     } else {
+      resetRecording();
+      trailCoordsRef.current = [];
+      totalDistanceRef.current = 0;
+      lastCoordRef.current = null;
+      setTraceDistance("0.0 mi");
+      setTrailCoordinates([]);
       setIsRecording(true);
       setIsAddMenuOpen(false);
       setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));

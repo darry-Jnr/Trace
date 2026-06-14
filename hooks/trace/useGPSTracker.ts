@@ -42,6 +42,11 @@ export function useGPSTracker(
   const pathCoordsRef = useRef<[number, number][]>([]);
   const kalmanFilterRef = useRef<KalmanFilter>(new KalmanFilter());
 
+  const resetRecording = useCallback(() => {
+    pathCoordsRef.current = [];
+    kalmanFilterRef.current.reset();
+  }, []);
+
   // FIX #1 & #2: Store callbacks in stable refs so they never appear in
   // useEffect dependency arrays. This prevents the GPS watchPosition from
   // being torn down and recreated on every single render.
@@ -172,5 +177,5 @@ export function useGPSTracker(
     // so this effect runs exactly once and the watch is never torn down.
   }, [gpsRetryCount]);
 
-  return { baseLocation, userLocation, isLoading, loadingStage, hasGpsFix, gpsAccuracy, retryGps };
+  return { baseLocation, userLocation, isLoading, loadingStage, hasGpsFix, gpsAccuracy, retryGps, resetRecording };
 }
