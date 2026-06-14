@@ -439,7 +439,6 @@ export default function TraceWorkspacePage() {
     uploadFile(file, id, wpId).then((url) => {
       if (url) {
         pendingMediaRef.current.delete(wpId); // already uploaded — no need to re-upload at save
-        URL.revokeObjectURL(blobUrl);
         setSavedMedia((prev) =>
           prev.map((m) => (m.id === wpId ? { ...m, fileUrl: url } : m))
         );
