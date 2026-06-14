@@ -33,13 +33,16 @@ export default function NameModal({
 
   const handleContinue = () => {
     const finalName = name.trim() || generateGuestName();
+    const nameType = name.trim() ? "custom" : "generated";
     localStorage.setItem("visitor_name", finalName);
+    (window as any).pendo?.track('Visitor Name Set', { nameType, nameLength: finalName.length });
     onComplete(finalName);
   };
 
   const handleSkip = () => {
     const guestName = generateGuestName();
     localStorage.setItem("visitor_name", guestName);
+    (window as any).pendo?.track('Visitor Name Set', { nameType: "skipped", nameLength: guestName.length });
     onComplete(guestName);
   };
 
