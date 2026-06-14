@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   Route,
@@ -11,6 +11,7 @@ import {
   LoaderCircle,
   Check,
 } from "lucide-react";
+import { douglasPeucker } from "@/hooks/trace/douglasPeucker";
 
 interface SaveReviewModalProps {
   isOpen: boolean;
@@ -30,13 +31,16 @@ function generateProductionMapSnapshot(points: [number, number][]): string {
   if (!points || points.length < 2) return "";
 
   try {
-    const coordinateString = points
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (!token) return "";
+
+    const simplified = points.length > 50 ? douglasPeucker(points, 10) : points;
+
+    const coordinateString = simplified
       .map((p) => `${p[0]},${p[1]}`)
       .join(",");
 
     const pathConfiguration = `path-4+4f46e5-1(${coordinateString})`;
-
-    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
     return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/${pathConfiguration}/auto/400x300?access_token=${token}`;
   } catch (err) {
@@ -58,7 +62,12 @@ export default function SaveReviewModal({
   savePhase = "idle",
   createdAt = "",
 }: SaveReviewModalProps) {
+  const [imageError, setImageError] = useState(false);
   const mapSnapshotUrl = generateProductionMapSnapshot(points);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [points]);
 
   return (
     <div
@@ -106,12 +115,13 @@ export default function SaveReviewModal({
             <div className="max-w-md mx-auto px-5 pt-6 pb-10">
               <div className="relative overflow-hidden rounded-[32px] border border-black/[0.06] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.06)]">
                 <div className="relative aspect-[4/3] bg-[#edf0f2] overflow-hidden">
-                  {mapSnapshotUrl ? (
+                  {mapSnapshotUrl && !imageError ? (
                     <img
                       src={mapSnapshotUrl}
                       alt="Trace Path Route Snapshot"
                       className="absolute inset-0 w-full h-full object-cover animate-fade-in"
                       loading="lazy"
+                      onError={() => setImageError(true)}
                     />
                   ) : (
                     <div className="absolute inset-0 bg-[#eef1f4] flex items-center justify-center">

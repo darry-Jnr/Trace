@@ -52,7 +52,7 @@ export function useReplayGuidance(
     // Throttle: skip if already processing (max once per ~500ms tick)
     if (processingRef.current) return;
     processingRef.current = true;
-    const release = () => { processingRef.current = false; };
+    try {
 
     const start = trailCoordinates[0];
     const dist = getDistance(userLocation, start);
@@ -142,8 +142,10 @@ export function useReplayGuidance(
       setProgressCoords(trailCoordinates.slice(0, closestIdx + 1));
     }
 
-    release();
-  }, [userLocation, isReplayMode, trailCoordinates, waypoints, guidanceState]);
+    } finally {
+      processingRef.current = false;
+    }
+  }, [userLocation, isReplayMode, trailCoordinates, waypoints, guidanceState, syncPrompt]);
 
   const startGuidance = useCallback(() => {
     if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
