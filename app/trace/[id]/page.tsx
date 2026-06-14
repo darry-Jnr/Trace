@@ -7,7 +7,6 @@ import { useToast } from "@/components/ui/Toast";
 
 import { useGPSTracker } from "@/hooks/trace/useGPSTracker";
 import { snapToRoads } from "@/utils/snapToRoads";
-import { douglasPeucker } from "@/hooks/trace/douglasPeucker";
 import { chaikinSmooth } from "@/hooks/trace/chaikinSmooth";
 import { useMapEngine } from "@/hooks/trace/useMapEngine";
 import { useReplayGuidance } from "@/hooks/trace/useReplayGuidance";
@@ -59,9 +58,6 @@ export default function TraceWorkspacePage() {
   const [showPolishedMap, setShowPolishedMap] = useState(false);
   const [traceTitleInput, setTraceTitleInput] = useState("Unfinished Trail Trace");
   const [trailCoordinates, setTrailCoordinates] = useState<[number, number][]>([]);
-  const [rawCoordinates, setRawCoordinates] = useState<[number, number][]>([]);
-  const [snappedCoordinates, setSnappedCoordinates] = useState<[number, number][]>([]);
-  const [useSnapped, setUseSnapped] = useState(true);
   const [isReplayMode, setIsReplayMode] = useState(false);
   const [replayBaseLocation, setReplayBaseLocation] = useState<[number, number] | null>(null);
   const [traceDistance, setTraceDistance] = useState("0.0 mi");
@@ -504,19 +500,13 @@ export default function TraceWorkspacePage() {
       setIsAddMenuOpen(false);
       setTraceTitleInput(getNextUntitledTitle());
 
-      // Pre-process and smooth raw coordinates
-      const rawSimplified = chaikinSmooth(douglasPeucker(trailCoordsRef.current, 1.5), 2);
-      setRawCoordinates(rawSimplified);
+      const currentTrail = trailCoordsRef.current;
 
       setIsPolishing(true);
-      snapToRoads(trailCoordsRef.current).then((snapped) => {
-        setSnappedCoordinates(snapped);
-        
-        // Show snapped coordinates by default
-        const activeCoords = useSnapped ? snapped : rawSimplified;
-        setTrailCoordinates(activeCoords);
-        updateVectorPath(activeCoords);
-        setTraceDistance(formatDistance(activeCoords));
+      snapToRoads(currentTrail).then((snapped) => {
+        setTrailCoordinates(snapped);
+        updateVectorPath(snapped);
+        setTraceDistance(formatDistance(snapped));
 
         setIsPolishing(false);
         setShowPolishedMap(true);
@@ -526,12 +516,12 @@ export default function TraceWorkspacePage() {
           isStoppingRef.current = false;
         }, 800);
       }).catch((err) => {
-        console.error("Snapping failed, falling back to raw:", err);
-        setSnappedCoordinates(rawSimplified);
-        setTrailCoordinates(rawSimplified);
-        updateVectorPath(rawSimplified);
-        setTraceDistance(formatDistance(rawSimplified));
-        
+        console.error("Snapping failed, falling back to smoothed trail:", err);
+        const fallback = chaikinSmooth(currentTrail);
+        setTrailCoordinates(fallback);
+        updateVectorPath(fallback);
+        setTraceDistance(formatDistance(fallback));
+
         setIsPolishing(false);
         setShowSaveReview(true);
         isStoppingRef.current = false;
@@ -543,9 +533,6 @@ export default function TraceWorkspacePage() {
       lastCoordRef.current = null;
       setTraceDistance("0.0 mi");
       setTrailCoordinates([]);
-      setRawCoordinates([]);
-      setSnappedCoordinates([]);
-      setUseSnapped(true);
       setIsRecording(true);
       setIsAddMenuOpen(false);
       setRecordingStartedAt(new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
@@ -671,9 +658,6 @@ export default function TraceWorkspacePage() {
   const handleDiscardTrace = () => {
     setShowSaveReview(false);
     setTrailCoordinates([]);
-    setRawCoordinates([]);
-    setSnappedCoordinates([]);
-    setUseSnapped(true);
     trailCoordsRef.current = [];
     totalDistanceRef.current = 0;
     lastCoordRef.current = null;
@@ -681,14 +665,6 @@ export default function TraceWorkspacePage() {
     setTraceDistance("0.0 mi");
     toast.info("Trace discarded");
   };
-
-  const handleToggleSnapped = useCallback((val: boolean) => {
-    setUseSnapped(val);
-    const coords = val ? snappedCoordinates : rawCoordinates;
-    setTrailCoordinates(coords);
-    updateVectorPath(coords);
-    setTraceDistance(formatDistance(coords));
-  }, [snappedCoordinates, rawCoordinates, updateVectorPath]);
 
   // --- LOADER CONFIGURATION DIALS ---
   const loadingMessage = {
@@ -908,8 +884,6 @@ export default function TraceWorkspacePage() {
             isSaving={isSaving}
             savePhase={savePhase}
             createdAt={recordingStartedAt}
-            useSnapped={useSnapped}
-            onToggleSnapped={handleToggleSnapped}
           />
         </div>
       )}

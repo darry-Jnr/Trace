@@ -5,7 +5,7 @@ export class KalmanFilter {
   private lastTimestamp: number | null = null;
 
   private static readonly DEG_PER_M = 1 / 111000;
-  private static readonly Q_ACC = 2e-10;
+  private static readonly Q_ACC = 5e-11;
 
   update(
     measurement: [number, number],

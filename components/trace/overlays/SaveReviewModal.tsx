@@ -24,8 +24,6 @@ interface SaveReviewModalProps {
   isSaving?: boolean;
   savePhase?: "idle" | "saving" | "success";
   createdAt?: string;
-  useSnapped?: boolean;
-  onToggleSnapped?: (val: boolean) => void;
 }
 
 function generateProductionMapSnapshot(points: [number, number][]): string {
@@ -59,8 +57,6 @@ export default function SaveReviewModal({
   isSaving = false,
   savePhase = "idle",
   createdAt = "",
-  useSnapped = true,
-  onToggleSnapped,
 }: SaveReviewModalProps) {
   const mapSnapshotUrl = generateProductionMapSnapshot(points);
 
@@ -164,33 +160,6 @@ export default function SaveReviewModal({
                       disabled={savePhase === "saving"}
                       className="w-full h-14 px-5 rounded-2xl bg-[#f5f5f7] border border-transparent focus:border-black/10 focus:bg-white outline-none transition text-[15px] font-medium tracking-tight placeholder:text-black/25 disabled:opacity-40"
                     />
-                  </div>
-
-                  {/* Optimization Toggle */}
-                  <div className="mt-4 p-4 rounded-2xl bg-[#f5f5f7] border border-black/[0.02] flex items-center justify-between transition-all">
-                    <div className="flex-1 pr-4">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <Sparkles className="w-3.5 h-3.5 text-black/60" />
-                        <span className="text-[13px] font-semibold tracking-tight text-black/80">Snap to Trails</span>
-                      </div>
-                      <p className="text-[11px] font-medium text-black/40 leading-snug">
-                        Aligns path coordinates to established walking paths and streets.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onToggleSnapped?.(!useSnapped)}
-                      disabled={savePhase === "saving"}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none active:scale-95 ${
-                        useSnapped ? "bg-black" : "bg-black/10"
-                      } disabled:opacity-40 disabled:pointer-events-none`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                          useSnapped ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mt-4">

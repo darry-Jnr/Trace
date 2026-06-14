@@ -41,9 +41,11 @@ export function useGPSTracker(
   const isRecordingRef = useRef(isRecording);
   const pathCoordsRef = useRef<[number, number][]>([]);
   const kalmanFilterRef = useRef<KalmanFilter>(new KalmanFilter());
+  const lastRecordTimestampRef = useRef<number | null>(null);
 
   const resetRecording = useCallback(() => {
     pathCoordsRef.current = [];
+    lastRecordTimestampRef.current = null;
     kalmanFilterRef.current.reset();
   }, []);
 
@@ -130,7 +132,8 @@ export function useGPSTracker(
         const accuracy = position.coords.accuracy;
         const heading = position.coords.heading;
 
-        if (accuracy > (isRecordingRef.current ? 45 : 100)) return;
+        // Tier 1 (loose): Always update the visible marker dot — keeps it moving even under mediocre coverage
+        if (accuracy > 100) return;
 
         setGpsAccuracy(accuracy);
 
@@ -147,16 +150,30 @@ export function useGPSTracker(
         onLocationUpdateRef.current(finalCoords, heading);
 
         if (isRecordingRef.current) {
+          // Tier 2 (strict): Only record into the trail path with tight accuracy
+          // This prevents GPS glitch jumps from drawing phantom straight lines
+          if (accuracy > 25) return;
+
           const history = pathCoordsRef.current;
           if (history.length === 0) {
             pathCoordsRef.current = [finalCoords];
+            lastRecordTimestampRef.current = position.timestamp;
             onPathAppendRef.current(pathCoordsRef.current);
           } else {
             const lastSavedPoint = history[history.length - 1];
             const distanceMoved = getDistanceMeters(lastSavedPoint, finalCoords);
 
-            if (distanceMoved > 1.5) {
+            // Velocity sanity check: reject a point if it implies moving >80m in under 3 seconds
+            // — that's physically impossible on foot and is a GPS glitch reading
+            const timeDeltaMs = lastRecordTimestampRef.current
+              ? position.timestamp - lastRecordTimestampRef.current
+              : Infinity;
+            const impliedSpeedMs = timeDeltaMs > 0 ? distanceMoved / (timeDeltaMs / 1000) : 0;
+            const isGlitch = impliedSpeedMs > 27; // ~97 km/h — impossible walking speed
+
+            if (distanceMoved > 1.5 && !isGlitch) {
               pathCoordsRef.current = [...history, finalCoords];
+              lastRecordTimestampRef.current = position.timestamp;
               onPathAppendRef.current(pathCoordsRef.current);
             }
           }
