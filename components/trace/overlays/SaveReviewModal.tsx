@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   X,
   Route,
@@ -62,12 +62,7 @@ export default function SaveReviewModal({
   savePhase = "idle",
   createdAt = "",
 }: SaveReviewModalProps) {
-  const [imageError, setImageError] = useState(false);
   const mapSnapshotUrl = generateProductionMapSnapshot(points);
-
-  useEffect(() => {
-    setImageError(false);
-  }, [points]);
 
   return (
     <div
@@ -115,13 +110,13 @@ export default function SaveReviewModal({
             <div className="max-w-md mx-auto px-5 pt-6 pb-10">
               <div className="relative overflow-hidden rounded-[32px] border border-black/[0.06] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.06)]">
                 <div className="relative aspect-[4/3] bg-[#edf0f2] overflow-hidden">
-                  {mapSnapshotUrl && !imageError ? (
+                  {mapSnapshotUrl ? (
                     <img
+                      key={mapSnapshotUrl}
                       src={mapSnapshotUrl}
                       alt="Trace Path Route Snapshot"
                       className="absolute inset-0 w-full h-full object-cover animate-fade-in"
                       loading="lazy"
-                      onError={() => setImageError(true)}
                     />
                   ) : (
                     <div className="absolute inset-0 bg-[#eef1f4] flex items-center justify-center">
