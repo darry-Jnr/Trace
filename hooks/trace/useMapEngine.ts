@@ -159,7 +159,15 @@ export function useMapEngine(
     if (!map) return;
 
     const apply = () => {
-      if (map.getSource("ghost-trail-source")) return;
+      // Clean up existing replay layers if they exist (handles style reload)
+      if (map.getLayer("progress-trail-layer")) {
+        map.removeLayer("progress-trail-layer");
+        map.removeSource("progress-trail-source");
+      }
+      if (map.getLayer("ghost-trail-layer")) {
+        map.removeLayer("ghost-trail-layer");
+        map.removeSource("ghost-trail-source");
+      }
 
       map.addSource("ghost-trail-source", {
         type: "geojson",
@@ -171,7 +179,7 @@ export function useMapEngine(
         type: "line",
         source: "ghost-trail-source",
         layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.22 },
+        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.5 },
       });
 
       map.addSource("progress-trail-source", {
@@ -198,8 +206,11 @@ export function useMapEngine(
     if (map.isStyleLoaded()) {
       apply();
     } else {
-      map.once("style.load", apply);
+      map.on("style.load", apply);
     }
+
+    // Return cleanup function to remove listener
+    return () => { map.off("style.load", apply); };
   }, []);
 
   const removeReplayVisuals = useCallback(() => {
@@ -220,7 +231,11 @@ export function useMapEngine(
   // Mount/unmount replay visuals when replay mode changes
   useEffect(() => {
     if (isReplayMode) {
-      addReplayVisuals();
+      const cleanup = addReplayVisuals();
+      return () => {
+        if (typeof cleanup === "function") cleanup();
+        removeReplayVisuals();
+      };
     } else {
       removeReplayVisuals();
     }
