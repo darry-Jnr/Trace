@@ -3,29 +3,21 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type mapboxgl from "mapbox-gl";
 import { ViewMode, WaypointMedia, WaypointGroup, groupWaypoints, CACHE_KEY } from "@/types";
-import { chaikinSmooth } from "./chaikinSmooth";
 
-export function useMapEngine(
+export function useRecordMapEngine(
   mapRef: React.RefObject<HTMLDivElement | null>,
   baseLocation: [number, number] | null,
   onGroupSelect: (group: WaypointGroup) => void,
   trailCoordinates: [number, number][] = [],
   savedMedia: WaypointMedia[] = [],
   isRecording: boolean = false,
-  isReplayMode: boolean = false,
-  isSynced: boolean = false,
-  isFollowing: boolean = false,
-  unlockedWaypointIds: Set<string> = new Set(),
-  progressCoords: [number, number][] = [],
   gpsAccuracy: number = 0
 ) {
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const startMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const injectedMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
   const [mapError, setMapError] = useState<string | null>(null);
-  const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mapboxglRef = useRef<any>(null);
   const userCoordsRef = useRef<[number, number] | null>(null);
   const lastCenteredRef = useRef<[number, number] | null>(null);
@@ -64,7 +56,6 @@ export function useMapEngine(
           attributionControl: false,
         });
 
-        const isReplayOnMount = isReplayMode;
         map.on("style.load", () => {
           map.setFog({
             color: "rgb(230, 240, 255)",
@@ -86,7 +77,7 @@ export function useMapEngine(
             type: "line",
             source: "recording-trail-source",
             layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
+            paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.95 },
           });
 
           map.addSource("accuracy-circle-source", {
@@ -111,18 +102,14 @@ export function useMapEngine(
               "circle-stroke-opacity": 0.3,
             },
           });
-
-          // Retry replay visuals — map is now ready
-          if (isReplayOnMount) addReplayVisuals();
         });
 
-        // User marker — starts green in replay (viewer), blue in recording
+        // User marker — starts blue in recording
         const el = document.createElement("div");
-        const isViewerMode = isReplayMode && !isSynced;
-        el.className = `w-5 h-5 rounded-full border-4 border-white flex items-center justify-center relative`;
-        el.style.background = isViewerMode ? "#22C55E" : "#0052FF";
-        el.style.boxShadow = isViewerMode ? "0 2px 10px rgba(34,197,94,0.4)" : "0 2px 10px rgba(0,82,255,0.4)";
-        el.innerHTML = `<span class="absolute inset-0 rounded-full animate-ping scale-150 pointer-events-none" style="animation-duration: 2s; background: ${isViewerMode ? "#22C55E" : "#0052FF"}30" />`;
+        el.className = "w-5 h-5 rounded-full border-4 border-white flex items-center justify-center relative";
+        el.style.background = "#0052FF";
+        el.style.boxShadow = "0 2px 10px rgba(0,82,255,0.4)";
+        el.innerHTML = `<span class="absolute inset-0 rounded-full animate-ping scale-150 pointer-events-none" style="animation-duration: 2s; background: #0052FF30" />`;
 
         const userMarker = new mapboxgl.Marker({ element: el }).setLngLat(baseLocation).addTo(map);
 
@@ -140,7 +127,6 @@ export function useMapEngine(
     return () => {
       cancelled = true;
       if (userMarkerRef.current) userMarkerRef.current.remove();
-      removeReplayVisuals();
       if (mapInstanceRef.current) mapInstanceRef.current.remove();
       mapInstanceRef.current = null;
       markerCache.forEach((marker) => marker.remove());
@@ -148,172 +134,15 @@ export function useMapEngine(
     };
   }, [baseLocation, mapRef]);
 
-  const trailCoordsRef = useRef(trailCoordinates);
-  useEffect(() => { trailCoordsRef.current = trailCoordinates; }, [trailCoordinates]);
   useEffect(() => { accuracyRef.current = gpsAccuracy; }, [gpsAccuracy]);
-  const baseLocRef = useRef(baseLocation);
-  useEffect(() => { baseLocRef.current = baseLocation; }, [baseLocation]);
 
-  const addReplayVisuals = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    const apply = () => {
-      // Clean up existing replay layers if they exist (handles style reload)
-      if (map.getLayer("progress-trail-layer")) {
-        map.removeLayer("progress-trail-layer");
-        map.removeSource("progress-trail-source");
-      }
-      if (map.getLayer("ghost-trail-layer")) {
-        map.removeLayer("ghost-trail-layer");
-        map.removeSource("ghost-trail-source");
-      }
-
-      map.addSource("ghost-trail-source", {
-        type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } },
-      });
-
-      map.addLayer({
-        id: "ghost-trail-layer",
-        type: "line",
-        source: "ghost-trail-source",
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.5 },
-      });
-
-      map.addSource("progress-trail-source", {
-        type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } },
-      });
-
-      map.addLayer({
-        id: "progress-trail-layer",
-        type: "line",
-        source: "progress-trail-source",
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
-      });
-
-      const startEl = document.createElement("div");
-      startEl.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
-      const coords = trailCoordsRef.current;
-      const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
-      const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
-      startMarkerRef.current = startMarker;
-    };
-
-    if (map.isStyleLoaded()) {
-      apply();
-    } else {
-      map.on("style.load", apply);
-    }
-
-    // Return cleanup function to remove listener
-    return () => { map.off("style.load", apply); };
-  }, []);
-
-  const removeReplayVisuals = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    if (map.getLayer("progress-trail-layer")) map.removeLayer("progress-trail-layer");
-    if (map.getSource("progress-trail-source")) map.removeSource("progress-trail-source");
-    if (map.getLayer("ghost-trail-layer")) map.removeLayer("ghost-trail-layer");
-    if (map.getSource("ghost-trail-source")) map.removeSource("ghost-trail-source");
-
-    if (startMarkerRef.current) {
-      startMarkerRef.current.remove();
-      startMarkerRef.current = null;
-    }
-  }, []);
-
-  // Mount/unmount replay visuals when replay mode changes
-  useEffect(() => {
-    if (isReplayMode) {
-      const cleanup = addReplayVisuals();
-      return () => {
-        if (typeof cleanup === "function") cleanup();
-        removeReplayVisuals();
-      };
-    } else {
-      removeReplayVisuals();
-    }
-  }, [isReplayMode]);
-
-  // Move start marker to trail start when trail loads in replay
-  useEffect(() => {
-    if (!isReplayMode || !startMarkerRef.current || trailCoordinates.length < 1) return;
-    startMarkerRef.current.setLngLat(trailCoordinates[0]);
-  }, [isReplayMode, trailCoordinates]);
-
-  // Update ghost trail data
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !isReplayMode || trailCoordinates.length < 2) return;
-
-    const applyGhost = () => {
-      const source = map.getSource("ghost-trail-source") as mapboxgl.GeoJSONSource;
-      if (source) {
-        source.setData({
-          type: "Feature",
-          properties: {},
-          geometry: { type: "LineString", coordinates: chaikinSmooth(trailCoordinates) },
-        });
-      }
-    };
-
-    if (map.isStyleLoaded()) {
-      applyGhost();
-    } else {
-      map.once("style.load", applyGhost);
-    }
-  }, [isReplayMode, trailCoordinates]);
-
-  // Update progress trail data (solid blue line growing as user/simulator advances)
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !isReplayMode) return;
-
-    const applyProgress = () => {
-      const source = map.getSource("progress-trail-source") as mapboxgl.GeoJSONSource;
-      if (source && progressCoords.length >= 2) {
-        source.setData({
-          type: "Feature",
-          properties: {},
-          geometry: { type: "LineString", coordinates: progressCoords },
-        });
-      }
-    };
-
-    if (map.isStyleLoaded()) {
-      applyProgress();
-    } else {
-      map.once("style.load", applyProgress);
-    }
-  }, [isReplayMode, progressCoords]);
-
-  // Update user marker appearance based on mode state
+  // Update user marker appearance based on recording mode state
   useEffect(() => {
     const marker = userMarkerRef.current;
     if (!marker) return;
 
     const el = marker.getElement();
-    if (isReplayMode) {
-      if (isFollowing || isSynced) {
-        // Black dot during following (or after sync)
-        el.className = "w-5 h-5 rounded-full bg-black border-[3px] border-white shadow-[0_0_16px_rgba(0,0,0,0.5)] flex items-center justify-center relative";
-        el.innerHTML = `
-          <span class="absolute inset-0 rounded-full bg-black/30 animate-ping scale-[2] pointer-events-none" style="animation-duration: 1.5s;" />
-        `;
-      } else {
-        // Black dot before sync (matches brand)
-        el.className = "w-5 h-5 rounded-full bg-black border-[3px] border-white shadow-[0_0_16px_rgba(0,0,0,0.5)] flex items-center justify-center relative";
-        el.innerHTML = `
-          <span class="absolute inset-0 rounded-full bg-black/30 animate-ping scale-[1.8] pointer-events-none" style="animation-duration: 2s;" />
-        `;
-      }
-    } else if (isRecording) {
+    if (isRecording) {
       el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_20px_rgba(0,82,255,0.7),0_0_60px_rgba(0,82,255,0.3)] flex items-center justify-center relative";
       el.innerHTML = `
         <span class="absolute inset-0 rounded-full bg-[#0052FF]/40 animate-ping scale-[2] pointer-events-none" style="animation-duration: 1.2s;" />
@@ -323,17 +152,7 @@ export function useMapEngine(
       el.className = "w-5 h-5 rounded-full bg-[#0052FF] border-4 border-white shadow-[0_2px_10px_rgba(0,82,255,0.4)] flex items-center justify-center relative";
       el.innerHTML = `<span class="absolute inset-0 rounded-full bg-[#0052FF]/30 animate-ping scale-150 pointer-events-none" style="animation-duration: 2s;" />`;
     }
-  }, [isReplayMode, isSynced, isFollowing, isRecording]);
-
-  // Replay follow mode — heading-up, center on user, slower pan
-  const clockFollowRef = useRef(false);
-  useEffect(() => {
-    if (isReplayMode && isFollowing) {
-      clockFollowRef.current = true;
-    } else {
-      clockFollowRef.current = false;
-    }
-  }, [isReplayMode, isFollowing]);
+  }, [isRecording]);
 
   function getDistanceMeters(a: [number, number], b: [number, number]) {
     const R = 6371000;
@@ -372,36 +191,14 @@ export function useMapEngine(
       map.setPaintProperty("accuracy-circle-layer", "circle-radius", Math.min(radiusPx, 300));
     }
 
-    if (isReplayMode && isFollowing) {
-      const targetBearing = heading !== null && heading !== undefined ? heading : map.getBearing();
-      map.easeTo({ center: coords, zoom: 17, bearing: targetBearing, duration: 1500 });
-    } else if (!isReplayMode) {
-      // Skip re-centering if user hasn't moved enough to prevent map shaking
-      const lastCenter = lastCenteredRef.current;
-      if (lastCenter && getDistanceMeters(lastCenter, coords) < 5) return;
+    // Skip re-centering if user hasn't moved enough to prevent map shaking
+    const lastCenter = lastCenteredRef.current;
+    if (lastCenter && getDistanceMeters(lastCenter, coords) < 5) return;
 
-      const targetBearing = heading !== null && heading !== undefined ? heading : map.getBearing();
-      map.easeTo({ center: coords, zoom: 17, bearing: targetBearing, duration: 1100 });
-      lastCenteredRef.current = coords;
-    }
+    const targetBearing = heading !== null && heading !== undefined ? heading : map.getBearing();
+    map.easeTo({ center: coords, zoom: 17, bearing: targetBearing, duration: 1100 });
+    lastCenteredRef.current = coords;
   };
-
-  // Update waypoint marker lock state
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !isReplayMode) return;
-
-    injectedMarkersRef.current.forEach((marker, id) => {
-      const el = marker.getElement();
-      if (unlockedWaypointIds.has(id)) {
-        el.style.opacity = "1";
-        el.style.filter = "none";
-      } else {
-        el.style.opacity = "0.35";
-        el.style.filter = "grayscale(1)";
-      }
-    });
-  }, [unlockedWaypointIds, isReplayMode]);
 
   const updateVectorPath = (coordinates: [number, number][]) => {
     const map = mapInstanceRef.current;
@@ -438,12 +235,7 @@ export function useMapEngine(
     const count = group.items.length;
 
     if (count === 1) {
-      // Single item — current marker style
       el.className = "w-8 h-8 rounded-[10px] bg-black text-white border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95 z-30";
-      if (isReplayMode) {
-        el.style.opacity = "0.35";
-        el.style.filter = "grayscale(1)";
-      }
       const wp = group.items[0];
       const icons: Record<string, string> = {
         text: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
@@ -452,13 +244,8 @@ export function useMapEngine(
       };
       el.innerHTML = icons[wp.type];
     } else {
-      // Multiple items — show type badges + count
       const types = [...new Set(group.items.map((i) => i.type))];
       el.className = "relative w-auto h-auto min-w-[36px] px-[6px] py-[5px] rounded-[10px] bg-black border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center gap-[3px] cursor-pointer transform transition-transform active:scale-95 z-30";
-      if (isReplayMode) {
-        el.style.opacity = "0.35";
-        el.style.filter = "grayscale(1)";
-      }
       const badgeIcons: Record<string, string> = {
         text: `<svg class="w-[12px] h-[12px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
         image: `<svg class="w-[12px] h-[12px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
@@ -484,23 +271,15 @@ export function useMapEngine(
   };
 
   // Sync vector path trail to Mapbox source layer automatically on updates
-  // In replay mode, hide the recording layer (ghost/progress layers take over)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     const applyPath = () => {
-      if (isReplayMode) {
-        // Hide the recording trail — ghost+progress layers show instead
-        if (map.getLayer("recording-trail-layer")) {
-          map.setLayoutProperty("recording-trail-layer", "visibility", "none");
-        }
-      } else {
-        if (map.getLayer("recording-trail-layer")) {
-          map.setLayoutProperty("recording-trail-layer", "visibility", "visible");
-        }
-        updateVectorPath(trailCoordinates);
+      if (map.getLayer("recording-trail-layer")) {
+        map.setLayoutProperty("recording-trail-layer", "visibility", "visible");
       }
+      updateVectorPath(trailCoordinates);
     };
 
     if (map.isStyleLoaded()) {
@@ -508,7 +287,7 @@ export function useMapEngine(
     } else {
       map.once("style.load", applyPath);
     }
-  }, [trailCoordinates, isReplayMode]);
+  }, [trailCoordinates]);
 
   const savedMediaRef = useRef(savedMedia);
   useEffect(() => {
