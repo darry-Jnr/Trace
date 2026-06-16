@@ -48,9 +48,14 @@ export function useReplayMapEngine(
         map.removeSource("ghost-trail-source");
       }
 
+      const ghostCoords = trailCoordsRef.current;
       map.addSource("ghost-trail-source", {
         type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } },
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: ghostCoords.length >= 2 ? chaikinSmooth(ghostCoords) : [] },
+        },
       });
 
       map.addLayer({
