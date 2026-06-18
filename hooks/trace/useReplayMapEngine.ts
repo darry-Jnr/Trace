@@ -13,7 +13,6 @@ export function useReplayMapEngine(
   savedMedia: WaypointMedia[] = [],
   isSynced: boolean = false,
   isFollowing: boolean = false,
-  unlockedWaypointIds: Set<string> = new Set(),
   progressCoords: [number, number][] = [],
   gpsAccuracy: number = 0,
   isCompleted: boolean = false
@@ -336,23 +335,6 @@ export function useReplayMapEngine(
     }
   };
 
-  // Update waypoint marker lock state
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    injectedMarkersRef.current.forEach((marker, id) => {
-      const el = marker.getElement();
-      if (unlockedWaypointIds.has(id)) {
-        el.style.opacity = "1";
-        el.style.filter = "none";
-      } else {
-        el.style.opacity = "0.35";
-        el.style.filter = "grayscale(1)";
-      }
-    });
-  }, [unlockedWaypointIds]);
-
   const toggleViewPerspective = () => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -376,8 +358,6 @@ export function useReplayMapEngine(
 
     if (count === 1) {
       el.className = "w-8 h-8 rounded-[10px] bg-black text-white border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center cursor-pointer transform transition-transform active:scale-95 z-30";
-      el.style.opacity = "0.35";
-      el.style.filter = "grayscale(1)";
       const wp = group.items[0];
       const icons: Record<string, string> = {
         text: `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
@@ -388,8 +368,6 @@ export function useReplayMapEngine(
     } else {
       const types = [...new Set(group.items.map((i) => i.type))];
       el.className = "relative w-auto h-auto min-w-[36px] px-[6px] py-[5px] rounded-[10px] bg-black border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center gap-[3px] cursor-pointer transform transition-transform active:scale-95 z-30";
-      el.style.opacity = "0.35";
-      el.style.filter = "grayscale(1)";
       const badgeIcons: Record<string, string> = {
         text: `<svg class="w-[12px] h-[12px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
         image: `<svg class="w-[12px] h-[12px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,

@@ -20,7 +20,6 @@ function getDistance(a: [number, number], b: [number, number]): number {
 }
 
 const SYNC_THRESHOLD = 15;
-const WAYPOINT_UNLOCK_THRESHOLD = 25;
 const COMPLETION_THRESHOLD = 20;
 
 export function useReplayGuidance(
@@ -31,7 +30,6 @@ export function useReplayGuidance(
 ) {
   const [guidanceState, setGuidanceState] = useState<"idle" | "synced" | "following" | "complete">("idle");
   const [distanceToStart, setDistanceToStart] = useState<number | null>(null);
-  const [unlockedWaypointIds, setUnlockedWaypointIds] = useState<Set<string>>(new Set());
   const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
   const [trailProgress, setTrailProgress] = useState(0);
   const [progressCoords, setProgressCoords] = useState<[number, number][]>([]);
@@ -40,7 +38,6 @@ export function useReplayGuidance(
 
   const syncedRef = useRef(false);
   const completedRef = useRef(false);
-  const triggeredWpRef = useRef<Set<string>>(new Set());
   const lastLocationRef = useRef<[number, number] | null>(null);
   const processingRef = useRef(false);
   const midTrailCheckedRef = useRef(false);
@@ -107,17 +104,6 @@ export function useReplayGuidance(
     lastLocationRef.current = userLocation;
 
     if ((guidanceState === "following" || syncedRef.current) && hasMoved) {
-      for (const wp of waypoints) {
-        if (!triggeredWpRef.current.has(wp.id)) {
-          const wpDist = getDistance(userLocation, wp.coordinates);
-          if (wpDist <= WAYPOINT_UNLOCK_THRESHOLD) {
-            triggeredWpRef.current.add(wp.id);
-            setUnlockedWaypointIds((prev) => new Set(prev).add(wp.id));
-            setActiveWaypoint(wp);
-          }
-        }
-      }
-
       let closestIdx = 0;
       let minDist = Infinity;
       for (let i = 0; i < trailCoordinates.length; i++) {
@@ -163,27 +149,12 @@ export function useReplayGuidance(
     setActiveWaypoint(null);
   }, []);
 
-  const checkWaypointsAt = useCallback((coords: [number, number]) => {
-    for (const wp of waypoints) {
-      if (!triggeredWpRef.current.has(wp.id)) {
-        const wpDist = getDistance(coords, wp.coordinates);
-        if (wpDist <= WAYPOINT_UNLOCK_THRESHOLD) {
-          triggeredWpRef.current.add(wp.id);
-          setUnlockedWaypointIds((prev) => new Set(prev).add(wp.id));
-          setActiveWaypoint(wp);
-        }
-      }
-    }
-  }, [waypoints]);
-
   const reset = useCallback(() => {
     syncedRef.current = false;
     completedRef.current = false;
-    triggeredWpRef.current = new Set();
     midTrailCheckedRef.current = false;
     setGuidanceState("idle");
     setDistanceToStart(null);
-    setUnlockedWaypointIds(new Set());
     setActiveWaypoint(null);
     setTrailProgress(0);
     setProgressCoords([]);
@@ -196,14 +167,12 @@ export function useReplayGuidance(
     distanceToStart,
     trailProgress,
     progressCoords,
-    unlockedWaypointIds,
     activeWaypoint,
     syncPrompt,
     skipPercent,
     startGuidance,
     dismissSyncPrompt,
     dismissWaypoint,
-    checkWaypointsAt,
     reset,
   };
 }

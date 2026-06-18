@@ -115,8 +115,6 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
     distanceToStart,
     trailProgress,
     progressCoords,
-    unlockedWaypointIds,
-    activeWaypoint: unlockedWaypoint,
     syncPrompt,
     skipPercent,
     startGuidance,
@@ -148,14 +146,12 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
     savedMedia,
     guidanceState === "synced",
     guidanceState === "following",
-    unlockedWaypointIds,
     progressCoords,
     gpsAccuracy,
     guidanceState === "complete"
   );
 
-  // In replay mode, use unlocked waypoint from guidance OR manually tapped one
-  const replayActiveWaypoint = unlockedWaypoint || activeWaypoint;
+  const replayActiveWaypoint = activeWaypoint;
   const handleDismissWaypoint = useCallback(() => {
     dismissWaypoint();
     setActiveWaypoint(null);
