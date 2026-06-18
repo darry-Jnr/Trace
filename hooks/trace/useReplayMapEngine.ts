@@ -66,7 +66,7 @@ export function useReplayMapEngine(
           type: "line",
           source: "ghost-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
-          paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.5 },
+          paint: { "line-color": "#FF0000", "line-width": 12, "line-opacity": 1.0 },
         });
 
         map.addSource("progress-trail-source", {
@@ -79,7 +79,7 @@ export function useReplayMapEngine(
           type: "line",
           source: "progress-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
-          paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
+          paint: { "line-color": "#00FF00", "line-width": 8, "line-opacity": 1.0 },
         });
 
         const startEl = document.createElement("div");
