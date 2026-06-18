@@ -84,7 +84,7 @@ export function useReplayMapEngine(
           paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
         });
 
-        const markerShape = "w-4 h-7 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
+        const markerShape = "w-5 h-5 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
         const coords = trailCoordsRef.current;
         const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
         const startEl = document.createElement("div");
@@ -297,8 +297,8 @@ export function useReplayMapEngine(
 
   // Update start/end marker colors based on guidance progress
   useEffect(() => {
-    const activeClass = "w-4 h-7 rounded-sm bg-black border-[3px] border-white shadow-[0_0_16px_rgba(0,0,0,0.6)] pointer-events-none";
-    const inactiveClass = "w-4 h-7 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
+    const activeClass = "w-5 h-5 rounded-sm bg-black border-[3px] border-white shadow-[0_0_16px_rgba(0,0,0,0.6)] pointer-events-none";
+    const inactiveClass = "w-5 h-5 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
     if (startMarkerRef.current) {
       startMarkerRef.current.getElement().className = isFollowing || isCompleted ? activeClass : inactiveClass;
     }
