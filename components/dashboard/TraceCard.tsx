@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { CornerUpRight, Copy, Trash2, MoreVertical, Route, X, Pencil, User } from "lucide-react";
+import { CornerUpRight, Copy, Trash2, MoreVertical, Route, X, Pencil, User, Users } from "lucide-react";
 
 interface TraceCardProps {
   title: string;
@@ -171,7 +171,7 @@ const TraceCard = ({
                   {title}
                 </h3>
               )}
-              <span title={isOwner ? "Owner" : "Shared"}><User className="w-3.5 h-3.5 text-black/25 shrink-0" /></span>
+              {!isOwner && <span title="Shared trace"><Users className="w-3.5 h-3.5 text-black/30 shrink-0" /></span>}
             </div>
 
             <div className="flex items-center gap-1.5 mt-1.5">
