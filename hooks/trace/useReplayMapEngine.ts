@@ -67,7 +67,7 @@ export function useReplayMapEngine(
           source: "ghost-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
           paint: { "line-color": "#FF0000", "line-width": 12, "line-opacity": 1.0 },
-        });
+        }, "road-label");
 
         map.addSource("progress-trail-source", {
           type: "geojson",
@@ -80,7 +80,7 @@ export function useReplayMapEngine(
           source: "progress-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
           paint: { "line-color": "#00FF00", "line-width": 8, "line-opacity": 1.0 },
-        });
+        }, "road-label");
 
         const startEl = document.createElement("div");
         startEl.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
