@@ -15,11 +15,13 @@ export function useReplayMapEngine(
   isFollowing: boolean = false,
   unlockedWaypointIds: Set<string> = new Set(),
   progressCoords: [number, number][] = [],
-  gpsAccuracy: number = 0
+  gpsAccuracy: number = 0,
+  isCompleted: boolean = false
 ) {
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const startMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const endMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const injectedMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
   const [mapError, setMapError] = useState<string | null>(null);
@@ -82,12 +84,21 @@ export function useReplayMapEngine(
           paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
         });
 
-        const startEl = document.createElement("div");
-        startEl.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
+        const markerShape = "w-4 h-7 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
         const coords = trailCoordsRef.current;
         const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
+        const startEl = document.createElement("div");
+        startEl.className = markerShape;
         const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
         startMarkerRef.current = startMarker;
+
+        const endLoc = coords.length > 0 ? coords[coords.length - 1] : null;
+        if (endLoc) {
+          const endEl = document.createElement("div");
+          endEl.className = markerShape;
+          const endMarker = new mapboxglRef.current.Marker({ element: endEl }).setLngLat(endLoc).addTo(map);
+          endMarkerRef.current = endMarker;
+        }
       } catch (e: any) {
         setMapError(e?.message || "Unknown error adding trail visuals");
       }
@@ -113,6 +124,10 @@ export function useReplayMapEngine(
     if (startMarkerRef.current) {
       startMarkerRef.current.remove();
       startMarkerRef.current = null;
+    }
+    if (endMarkerRef.current) {
+      endMarkerRef.current.remove();
+      endMarkerRef.current = null;
     }
   }, []);
 
@@ -206,6 +221,7 @@ export function useReplayMapEngine(
     return () => {
       cancelled = true;
       if (userMarkerRef.current) userMarkerRef.current.remove();
+      if (endMarkerRef.current) { endMarkerRef.current.remove(); endMarkerRef.current = null; }
       removeReplayVisuals();
       if (mapInstanceRef.current) mapInstanceRef.current.remove();
       mapInstanceRef.current = null;
@@ -278,6 +294,18 @@ export function useReplayMapEngine(
       el.innerHTML = `<span class="absolute inset-0 rounded-full bg-black/30 animate-ping scale-[1.8] pointer-events-none" style="animation-duration: 2s;" />`;
     }
   }, [isSynced, isFollowing]);
+
+  // Update start/end marker colors based on guidance progress
+  useEffect(() => {
+    const activeClass = "w-4 h-7 rounded-sm bg-black border-[3px] border-white shadow-[0_0_16px_rgba(0,0,0,0.6)] pointer-events-none";
+    const inactiveClass = "w-4 h-7 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
+    if (startMarkerRef.current) {
+      startMarkerRef.current.getElement().className = isFollowing || isCompleted ? activeClass : inactiveClass;
+    }
+    if (endMarkerRef.current) {
+      endMarkerRef.current.getElement().className = isCompleted ? activeClass : inactiveClass;
+    }
+  }, [isFollowing, isCompleted]);
 
   const handleLocationStream = (coords: [number, number], heading: number | null) => {
     const map = mapInstanceRef.current;
