@@ -51,13 +51,31 @@ export function useReplayMapEngine(
           map.removeLayer("ghost-trail-layer");
           map.removeSource("ghost-trail-source");
         }
+        if (map.getLayer("ghost-trail-dots-layer")) {
+          map.removeLayer("ghost-trail-dots-layer");
+        }
+        if (map.getSource("ghost-trail-points-source")) {
+          map.removeSource("ghost-trail-points-source");
+        }
+
+        const smoothed = ghostCoords.length >= 2 ? chaikinSmooth(ghostCoords) : [];
 
         map.addSource("ghost-trail-source", {
           type: "geojson",
           data: {
-            type: "Feature",
-            properties: {},
-            geometry: { type: "LineString", coordinates: ghostCoords.length >= 2 ? chaikinSmooth(ghostCoords) : [] },
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                properties: {},
+                geometry: { type: "LineString", coordinates: smoothed },
+              },
+              ...ghostCoords.map((c) => ({
+                type: "Feature" as const,
+                properties: {} as Record<string, unknown>,
+                geometry: { type: "Point" as const, coordinates: c },
+              })),
+            ],
           },
         });
 
@@ -67,7 +85,14 @@ export function useReplayMapEngine(
           source: "ghost-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
           paint: { "line-color": "#FF0000", "line-width": 12, "line-opacity": 1.0 },
-        }, "road-label");
+        });
+
+        map.addLayer({
+          id: "ghost-trail-dots-layer",
+          type: "circle",
+          source: "ghost-trail-source",
+          paint: { "circle-color": "#00FF00", "circle-radius": 8, "circle-opacity": 1.0 },
+        });
 
         map.addSource("progress-trail-source", {
           type: "geojson",
@@ -80,7 +105,7 @@ export function useReplayMapEngine(
           source: "progress-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
           paint: { "line-color": "#00FF00", "line-width": 8, "line-opacity": 1.0 },
-        }, "road-label");
+        });
 
         const startEl = document.createElement("div");
         startEl.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
@@ -110,6 +135,7 @@ export function useReplayMapEngine(
     if (map.getLayer("progress-trail-layer")) map.removeLayer("progress-trail-layer");
     if (map.getSource("progress-trail-source")) map.removeSource("progress-trail-source");
     if (map.getLayer("ghost-trail-layer")) map.removeLayer("ghost-trail-layer");
+    if (map.getLayer("ghost-trail-dots-layer")) map.removeLayer("ghost-trail-dots-layer");
     if (map.getSource("ghost-trail-source")) map.removeSource("ghost-trail-source");
 
     if (startMarkerRef.current) {
@@ -228,10 +254,21 @@ export function useReplayMapEngine(
     const applyGhost = () => {
       const source = map.getSource("ghost-trail-source") as mapboxgl.GeoJSONSource;
       if (source) {
+        const smoothed = chaikinSmooth(trailCoordinates);
         source.setData({
-          type: "Feature",
-          properties: {},
-          geometry: { type: "LineString", coordinates: chaikinSmooth(trailCoordinates) },
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "LineString", coordinates: smoothed },
+            },
+            ...trailCoordinates.map((c) => ({
+              type: "Feature" as const,
+              properties: {} as Record<string, unknown>,
+              geometry: { type: "Point" as const, coordinates: c },
+            })),
+          ],
         });
       }
     };
