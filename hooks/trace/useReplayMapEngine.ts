@@ -330,8 +330,7 @@ export function useReplayMapEngine(
     }
 
     if (isFollowing) {
-      const targetBearing = heading !== null && heading !== undefined ? heading : map.getBearing();
-      map.easeTo({ center: coords, zoom: 17, bearing: targetBearing, duration: 1500 });
+      map.easeTo({ center: coords, zoom: 17, duration: 1500 });
     }
   };
 
