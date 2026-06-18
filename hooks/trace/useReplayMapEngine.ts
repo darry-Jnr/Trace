@@ -42,8 +42,10 @@ export function useReplayMapEngine(
     if (!map) return;
 
     const apply = () => {
+      // Belt-and-suspenders: if map ref was cleared between call and apply, bail
+      const m = mapInstanceRef.current;
+      if (!m) return;
       const ghostCoords = trailCoordsRef.current;
-      console.warn("DEBUG: ghostCoords count:", ghostCoords.length, "sample:", ghostCoords.slice(0, 2));
 
       try {
         // Clean up existing replay layers if they exist (handles style reload)
@@ -135,13 +137,12 @@ export function useReplayMapEngine(
       }
     };
 
+    // Always try immediately
     if (map.isStyleLoaded()) {
       apply();
-    } else {
-      map.on("style.load", apply);
     }
-
-    return () => { map.off("style.load", apply); };
+    // Also register for next style.load as fallback
+    map.once("style.load", apply);
   }, []);
 
   const removeReplayVisuals = useCallback(() => {
@@ -195,6 +196,9 @@ export function useReplayMapEngine(
           attributionControl: false,
         });
 
+        // Set ref IMMEDIATELY — style.load can fire synchronously
+        mapInstanceRef.current = map;
+
         map.on("style.load", () => {
           map.setFog({
             color: "rgb(230, 240, 255)",
@@ -236,7 +240,6 @@ export function useReplayMapEngine(
 
         const userMarker = new mapboxgl.Marker({ element: el }).setLngLat(baseLocation).addTo(map);
 
-        mapInstanceRef.current = map;
         userMarkerRef.current = userMarker;
 
         // Poll map/layer state for on-screen debug badge
@@ -320,9 +323,8 @@ export function useReplayMapEngine(
 
     if (map.isStyleLoaded()) {
       applyGhost();
-    } else {
-      map.once("style.load", applyGhost);
     }
+    map.once("style.load", applyGhost);
   }, [trailCoordinates]);
 
   // Update progress trail data (solid black line growing as user/simulator advances)
@@ -343,9 +345,8 @@ export function useReplayMapEngine(
 
     if (map.isStyleLoaded()) {
       applyProgress();
-    } else {
-      map.once("style.load", applyProgress);
     }
+    map.once("style.load", applyProgress);
   }, [progressCoords]);
 
   // Update user marker appearance based on mode state
