@@ -38,6 +38,8 @@ export default function InitialLoader({
       return () => clearTimeout(timer);
     }
 
+    // isLoading started as false — hide immediately
+    setVisible(false);
     prevLoadingRef.current = isLoading;
   }, [isLoading]);
 
