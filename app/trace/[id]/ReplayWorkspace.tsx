@@ -136,7 +136,6 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
     zoomIn,
     zoomOut,
     mapError,
-    mapDebugInfo,
   } = useReplayMapEngine(
     mapRef,
     replayBaseLocation || baseLocation,
@@ -264,14 +263,13 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
         </div>
       </div>
 
-      {/* DEBUG: trail coordinate info + map state */}
+      {/* DEBUG: trail coordinate info */}
       {!showInitialLoader && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] px-3 py-1.5 rounded-full bg-black/80 text-white text-[11px] font-mono tracking-tight shadow-lg pointer-events-none">
           Trail: {trailCoordinates.length} pts
           {trailCoordinates.length > 0 && (
             <> &nbsp;|&nbsp; first: {trailCoordinates[0][0].toFixed(4)}, {trailCoordinates[0][1].toFixed(4)}</>
           )}
-          <> &nbsp;|&nbsp; {mapDebugInfo}</>
         </div>
       )}
 

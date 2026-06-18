@@ -27,10 +27,6 @@ export function useReplayMapEngine(
   const userCoordsRef = useRef<[number, number] | null>(null);
   const accuracyRef = useRef(gpsAccuracy);
 
-  const [mapDebugInfo, setMapDebugInfo] = useState("checking...");
-  const trailDotMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const debugTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const trailCoordsRef = useRef(trailCoordinates);
   useEffect(() => { trailCoordsRef.current = trailCoordinates; }, [trailCoordinates]);
   useEffect(() => { accuracyRef.current = gpsAccuracy; }, [gpsAccuracy]);
@@ -42,13 +38,9 @@ export function useReplayMapEngine(
     if (!map) return;
 
     const apply = () => {
-      // Belt-and-suspenders: if map ref was cleared between call and apply, bail
-      const m = mapInstanceRef.current;
-      if (!m) return;
       const ghostCoords = trailCoordsRef.current;
 
       try {
-        // Clean up existing replay layers if they exist (handles style reload)
         if (map.getLayer("progress-trail-layer")) {
           map.removeLayer("progress-trail-layer");
           map.removeSource("progress-trail-source");
@@ -57,34 +49,15 @@ export function useReplayMapEngine(
           map.removeLayer("ghost-trail-layer");
           map.removeSource("ghost-trail-source");
         }
-        if (map.getLayer("ghost-trail-dots-layer")) {
-          map.removeLayer("ghost-trail-dots-layer");
-        }
-        if (map.getSource("ghost-trail-points-source")) {
-          map.removeSource("ghost-trail-points-source");
-        }
-        // Clean up previous DOM trail markers (bypass GeoJSON test)
-        trailDotMarkersRef.current.forEach((m) => m.remove());
-        trailDotMarkersRef.current = [];
 
         const smoothed = ghostCoords.length >= 2 ? chaikinSmooth(ghostCoords) : [];
 
         map.addSource("ghost-trail-source", {
           type: "geojson",
           data: {
-            type: "FeatureCollection",
-            features: [
-              {
-                type: "Feature",
-                properties: {},
-                geometry: { type: "LineString", coordinates: smoothed },
-              },
-              ...ghostCoords.map((c) => ({
-                type: "Feature" as const,
-                properties: {} as Record<string, unknown>,
-                geometry: { type: "Point" as const, coordinates: c },
-              })),
-            ],
+            type: "Feature",
+            properties: {},
+            geometry: { type: "LineString", coordinates: smoothed },
           },
         });
 
@@ -93,14 +66,7 @@ export function useReplayMapEngine(
           type: "line",
           source: "ghost-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
-          paint: { "line-color": "#FF0000", "line-width": 12, "line-opacity": 1.0 },
-        });
-
-        map.addLayer({
-          id: "ghost-trail-dots-layer",
-          type: "circle",
-          source: "ghost-trail-source",
-          paint: { "circle-color": "#00FF00", "circle-radius": 8, "circle-opacity": 1.0 },
+          paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.5 },
         });
 
         map.addSource("progress-trail-source", {
@@ -113,7 +79,7 @@ export function useReplayMapEngine(
           type: "line",
           source: "progress-trail-source",
           layout: { "line-join": "round", "line-cap": "round" },
-          paint: { "line-color": "#00FF00", "line-width": 8, "line-opacity": 1.0 },
+          paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
         });
 
         const startEl = document.createElement("div");
@@ -122,17 +88,7 @@ export function useReplayMapEngine(
         const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
         const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
         startMarkerRef.current = startMarker;
-
-        // DOM trail markers (bypasses GeoJSON layer pipeline for diagnostic)
-        const markers = trailDotMarkersRef.current;
-        coords.forEach((c) => {
-          const dot = document.createElement("div");
-          dot.className = "w-[6px] h-[6px] rounded-full bg-[#00FF00] shadow-[0_0_6px_rgba(0,255,0,0.8)] pointer-events-none";
-          const m = new mapboxglRef.current.Marker({ element: dot }).setLngLat(c).addTo(map);
-          markers.push(m);
-        });
       } catch (e: any) {
-        console.error("DEBUG: addReplayVisuals error:", e);
         setMapError(e?.message || "Unknown error adding trail visuals");
       }
     };
@@ -152,15 +108,12 @@ export function useReplayMapEngine(
     if (map.getLayer("progress-trail-layer")) map.removeLayer("progress-trail-layer");
     if (map.getSource("progress-trail-source")) map.removeSource("progress-trail-source");
     if (map.getLayer("ghost-trail-layer")) map.removeLayer("ghost-trail-layer");
-    if (map.getLayer("ghost-trail-dots-layer")) map.removeLayer("ghost-trail-dots-layer");
     if (map.getSource("ghost-trail-source")) map.removeSource("ghost-trail-source");
 
     if (startMarkerRef.current) {
       startMarkerRef.current.remove();
       startMarkerRef.current = null;
     }
-    trailDotMarkersRef.current.forEach((m) => m.remove());
-    trailDotMarkersRef.current = [];
   }, []);
 
   // Mount Instance Mapbox Canvas
@@ -241,19 +194,6 @@ export function useReplayMapEngine(
         const userMarker = new mapboxgl.Marker({ element: el }).setLngLat(baseLocation).addTo(map);
 
         userMarkerRef.current = userMarker;
-
-        // Poll map/layer state for on-screen debug badge
-        debugTimerRef.current = setInterval(() => {
-          const m = mapInstanceRef.current;
-          if (!m) { setMapDebugInfo("no map instance"); return; }
-          const ghostSource = !!m.getSource("ghost-trail-source");
-          const ghostLayer = !!m.getLayer("ghost-trail-layer");
-          const ghostDots = !!m.getLayer("ghost-trail-dots-layer");
-          const trailLen = trailCoordsRef.current.length;
-          setMapDebugInfo(
-            `map=✓ src=${ghostSource} ly=${ghostLayer} dots=${ghostDots} pts=${trailLen}`
-          );
-        }, 3000);
       } catch (e) {
         if (!cancelled) {
           console.error("Failed to load Mapbox:", e);
@@ -265,8 +205,6 @@ export function useReplayMapEngine(
     const markerCache = injectedMarkersRef.current;
     return () => {
       cancelled = true;
-      if (debugTimerRef.current) clearInterval(debugTimerRef.current);
-      debugTimerRef.current = null;
       if (userMarkerRef.current) userMarkerRef.current.remove();
       removeReplayVisuals();
       if (mapInstanceRef.current) mapInstanceRef.current.remove();
@@ -290,33 +228,10 @@ export function useReplayMapEngine(
     const applyGhost = () => {
       const source = map.getSource("ghost-trail-source") as mapboxgl.GeoJSONSource;
       if (source) {
-        const smoothed = chaikinSmooth(trailCoordinates);
         source.setData({
-          type: "FeatureCollection",
-          features: [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "LineString", coordinates: smoothed },
-            },
-            ...trailCoordinates.map((c) => ({
-              type: "Feature" as const,
-              properties: {} as Record<string, unknown>,
-              geometry: { type: "Point" as const, coordinates: c },
-            })),
-          ],
-        });
-      }
-      // Refresh DOM trail markers
-      trailDotMarkersRef.current.forEach((m) => m.remove());
-      trailDotMarkersRef.current = [];
-      const mbgl = mapboxglRef.current;
-      if (mbgl) {
-        trailCoordinates.forEach((c) => {
-          const dot = document.createElement("div");
-          dot.className = "w-[6px] h-[6px] rounded-full bg-[#00FF00] shadow-[0_0_6px_rgba(0,255,0,0.8)] pointer-events-none";
-          const m = new mbgl.Marker({ element: dot }).setLngLat(c).addTo(map);
-          trailDotMarkersRef.current.push(m);
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: chaikinSmooth(trailCoordinates) },
         });
       }
     };
@@ -540,5 +455,5 @@ export function useReplayMapEngine(
     map.zoomOut({ duration: 300 });
   };
 
-  return { viewMode, toggleViewPerspective, handleLocationStream, centerOnCoords, zoomIn, zoomOut, mapError, mapDebugInfo };
+  return { viewMode, toggleViewPerspective, handleLocationStream, centerOnCoords, zoomIn, zoomOut, mapError };
 }
