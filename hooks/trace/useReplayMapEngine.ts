@@ -38,53 +38,60 @@ export function useReplayMapEngine(
     if (!map) return;
 
     const apply = () => {
-      // Clean up existing replay layers if they exist (handles style reload)
-      if (map.getLayer("progress-trail-layer")) {
-        map.removeLayer("progress-trail-layer");
-        map.removeSource("progress-trail-source");
-      }
-      if (map.getLayer("ghost-trail-layer")) {
-        map.removeLayer("ghost-trail-layer");
-        map.removeSource("ghost-trail-source");
-      }
-
       const ghostCoords = trailCoordsRef.current;
-      map.addSource("ghost-trail-source", {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "LineString", coordinates: ghostCoords.length >= 2 ? chaikinSmooth(ghostCoords) : [] },
-        },
-      });
+      console.warn("DEBUG: ghostCoords count:", ghostCoords.length, "sample:", ghostCoords.slice(0, 2));
 
-      map.addLayer({
-        id: "ghost-trail-layer",
-        type: "line",
-        source: "ghost-trail-source",
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.5 },
-      });
+      try {
+        // Clean up existing replay layers if they exist (handles style reload)
+        if (map.getLayer("progress-trail-layer")) {
+          map.removeLayer("progress-trail-layer");
+          map.removeSource("progress-trail-source");
+        }
+        if (map.getLayer("ghost-trail-layer")) {
+          map.removeLayer("ghost-trail-layer");
+          map.removeSource("ghost-trail-source");
+        }
 
-      map.addSource("progress-trail-source", {
-        type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } },
-      });
+        map.addSource("ghost-trail-source", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: { type: "LineString", coordinates: ghostCoords.length >= 2 ? chaikinSmooth(ghostCoords) : [] },
+          },
+        });
 
-      map.addLayer({
-        id: "progress-trail-layer",
-        type: "line",
-        source: "progress-trail-source",
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
-      });
+        map.addLayer({
+          id: "ghost-trail-layer",
+          type: "line",
+          source: "ghost-trail-source",
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: { "line-color": "#0052FF", "line-width": 5.5, "line-opacity": 0.5 },
+        });
 
-      const startEl = document.createElement("div");
-      startEl.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
-      const coords = trailCoordsRef.current;
-      const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
-      const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
-      startMarkerRef.current = startMarker;
+        map.addSource("progress-trail-source", {
+          type: "geojson",
+          data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } },
+        });
+
+        map.addLayer({
+          id: "progress-trail-layer",
+          type: "line",
+          source: "progress-trail-source",
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
+        });
+
+        const startEl = document.createElement("div");
+        startEl.className = "w-5 h-5 rounded-full bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
+        const coords = trailCoordsRef.current;
+        const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
+        const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
+        startMarkerRef.current = startMarker;
+      } catch (e: any) {
+        console.error("DEBUG: addReplayVisuals error:", e);
+        setMapError(e?.message || "Unknown error adding trail visuals");
+      }
     };
 
     if (map.isStyleLoaded()) {
