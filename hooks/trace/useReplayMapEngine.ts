@@ -86,24 +86,20 @@ export function useReplayMapEngine(
         const coords = trailCoordsRef.current;
         const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
 
-        const createFlagElement = (color: string) => {
+        const createDotMarker = (color: string) => {
           const el = document.createElement("div");
-          el.style.cssText = "width:20px;height:28px;position:relative;cursor:default;pointer-events:none;";
-          el.innerHTML = `
-            <div style="position:absolute;top:0;left:9px;width:2px;height:28px;background:#444;border-radius:1px;"></div>
-            <div style="position:absolute;top:2px;left:9px;width:12px;height:8px;background:${color};border-radius:0 2px 2px 0;box-shadow:0 1px 3px rgba(0,0,0,0.15);"></div>
-          `;
+          el.style.cssText = `width:18px;height:18px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:default;pointer-events:none;`;
           return el;
         };
 
-        const startEl = createFlagElement("#0052FF");
-        const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
+        const startEl = createDotMarker("#00E676");
+        const startMarker = new mapboxglRef.current.Marker({ element: startEl, anchor: "center" }).setLngLat(startLoc).addTo(map);
         startMarkerRef.current = startMarker;
 
         const endLoc = coords.length > 0 ? coords[coords.length - 1] : null;
         if (endLoc) {
-          const endEl = createFlagElement("#0052FF");
-          const endMarker = new mapboxglRef.current.Marker({ element: endEl }).setLngLat(endLoc).addTo(map);
+          const endEl = createDotMarker("#FF3D5A");
+          const endMarker = new mapboxglRef.current.Marker({ element: endEl, anchor: "center" }).setLngLat(endLoc).addTo(map);
           endMarkerRef.current = endMarker;
         }
       } catch (e: any) {
@@ -237,10 +233,27 @@ export function useReplayMapEngine(
     };
   }, [baseLocation, mapRef, addReplayVisuals, removeReplayVisuals]);
 
-  // Move start marker to trail start when trail loads
+  // Move start and end markers to correct trail positions when trail loads
   useEffect(() => {
-    if (!startMarkerRef.current || trailCoordinates.length < 1) return;
-    startMarkerRef.current.setLngLat(trailCoordinates[0]);
+    if (trailCoordinates.length < 1) return;
+
+    if (startMarkerRef.current) {
+      startMarkerRef.current.setLngLat(trailCoordinates[0]);
+    }
+
+    const endLoc = trailCoordinates[trailCoordinates.length - 1];
+    if (endMarkerRef.current) {
+      // Already exists — just reposition it
+      endMarkerRef.current.setLngLat(endLoc);
+    } else if (mapInstanceRef.current && mapboxglRef.current) {
+      // End marker was skipped during addReplayVisuals (trail was empty then) — create it now
+      const el = document.createElement("div");
+      el.style.cssText = "width:18px;height:18px;border-radius:50%;background:#FF3D5A;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:default;pointer-events:none;";
+      const endMarker = new mapboxglRef.current.Marker({ element: el, anchor: "center" })
+        .setLngLat(endLoc)
+        .addTo(mapInstanceRef.current);
+      endMarkerRef.current = endMarker;
+    }
   }, [trailCoordinates]);
 
   // Update ghost trail data
@@ -304,14 +317,14 @@ export function useReplayMapEngine(
 
   // Update start/end marker colors based on guidance progress
   useEffect(() => {
-    const setFlagColor = (marker: mapboxgl.Marker | null, active: boolean) => {
+    const setDotColor = (marker: mapboxgl.Marker | null, color: string) => {
       if (!marker) return;
-      const el = marker.getElement();
-      const flag = el.querySelector("div:last-child") as HTMLElement | null;
-      if (flag) flag.style.background = active ? "#000" : "#0052FF";
+      marker.getElement().style.background = color;
     };
-    setFlagColor(startMarkerRef.current, isFollowing || isCompleted);
-    setFlagColor(endMarkerRef.current, isCompleted);
+    // Start dot: green → black once user is walking the trail
+    setDotColor(startMarkerRef.current, (isFollowing || isCompleted) ? "#000" : "#00E676");
+    // End dot: red → black once trail is completed
+    setDotColor(endMarkerRef.current, isCompleted ? "#000" : "#FF3D5A");
   }, [isFollowing, isCompleted]);
 
   const handleLocationStream = (coords: [number, number], heading: number | null) => {
