@@ -88,7 +88,7 @@ export function useReplayMapEngine(
 
         const createDotMarker = (color: string) => {
           const el = document.createElement("div");
-          el.style.cssText = `width:18px;height:18px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:default;pointer-events:none;`;
+          el.style.cssText = `width:18px;height:18px;border-radius:50%;background:${color};box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:default;pointer-events:none;`;
           return el;
         };
 
@@ -248,7 +248,7 @@ export function useReplayMapEngine(
     } else if (mapInstanceRef.current && mapboxglRef.current) {
       // End marker was skipped during addReplayVisuals (trail was empty then) — create it now
       const el = document.createElement("div");
-      el.style.cssText = "width:18px;height:18px;border-radius:50%;background:#FF3D5A;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:default;pointer-events:none;";
+      el.style.cssText = "width:18px;height:18px;border-radius:50%;background:#FF3D5A;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:default;pointer-events:none;";
       const endMarker = new mapboxglRef.current.Marker({ element: el, anchor: "center" })
         .setLngLat(endLoc)
         .addTo(mapInstanceRef.current);
