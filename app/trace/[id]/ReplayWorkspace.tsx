@@ -49,6 +49,7 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
   const [showNameModal, setShowNameModal] = useState(false);
   const [commentName, setCommentName] = useState<string | null>(null);
   const [commentCount, setCommentCount] = useState(0);
+  const [pinnedComment, setPinnedComment] = useState<{ author_name: string; content: string } | null>(null);
 
   // Active waypoints state (tapped or unlocked)
   const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
@@ -73,7 +74,11 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
     fetch(`/api/trace/${id}/comments`)
       .then((r) => r.json())
       .then((res) => {
-        if (res.success) setCommentCount(res.count);
+        if (res.success) {
+          setCommentCount(res.count);
+          const pinned = (res.data as { author_name: string; content: string; is_pinned: boolean }[]).find((c) => c.is_pinned);
+          setPinnedComment(pinned ? { author_name: pinned.author_name, content: pinned.content } : null);
+        }
       })
       .catch(() => {});
   }, [id]);
@@ -197,6 +202,7 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
           onDismissWaypoint={handleDismissWaypoint}
           onBack={() => router.push("/dashboard")}
           commentCount={commentCount}
+          pinnedComment={pinnedComment}
           onRetrace={() => resetGuidance()}
           onCommentsClick={() => {
             const storedName = localStorage.getItem("visitor_name");

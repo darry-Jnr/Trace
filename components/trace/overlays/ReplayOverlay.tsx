@@ -17,6 +17,7 @@ interface ReplayOverlayProps {
   onCommentsClick: () => void;
   onRetrace: () => void;
   commentCount?: number;
+  pinnedComment?: { author_name: string; content: string } | null;
 }
 
 function formatDistance(meters: number): string {
@@ -37,6 +38,7 @@ export default function ReplayOverlay({
   onCommentsClick,
   onRetrace,
   commentCount = 0,
+  pinnedComment = null,
 }: ReplayOverlayProps) {
   const [showCompletion, setShowCompletion] = useState(false);
   const [completionDismissed, setCompletionDismissed] = useState(false);
@@ -81,6 +83,24 @@ export default function ReplayOverlay({
           <path d="M12 19l-7-7 7-7" />
         </svg>
       </button>
+
+      {/* Pinned comment card — bottom-left, always visible when a comment is pinned */}
+      {pinnedComment && !activeWaypoint && syncPrompt !== "start" && (
+        <button
+          onClick={onCommentsClick}
+          className="absolute bottom-6 left-5 z-40 max-w-[220px] text-left animate-fade-in"
+        >
+          <div className="px-3.5 py-2.5 rounded-2xl bg-white/90 backdrop-blur-2xl border border-black/[0.05] shadow-[0_4px_24px_rgba(0,0,0,0.10)]">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Pin className="w-2.5 h-2.5 text-black/35 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-black/35">{pinnedComment.author_name}</span>
+            </div>
+            <p className="text-[12px] font-medium text-black/75 leading-snug line-clamp-2">
+              {pinnedComment.content}
+            </p>
+          </div>
+        </button>
+      )}
 
       {/* Comments button — middle-right (YouTube style) */}
       <div className="absolute top-1/2 right-5 -translate-y-1/2 z-40 flex flex-col items-center gap-1.5">
