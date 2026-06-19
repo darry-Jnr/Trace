@@ -360,20 +360,35 @@ export default function RecordWorkspace({ id }: RecordWorkspaceProps) {
     setSavePhase("saving");
 
     const uploadedUrls = new Map<string, string>();
+    const pendingContentUrls = new Map<string, string>();
     const uploadPromises: Promise<void>[] = [];
+
     for (const wp of savedMedia) {
       const pendingData = pendingMediaRef.current.get(wp.id);
       if (!pendingData) continue;
 
       if (wp.type === "voice") {
         const blob = pendingData as Blob;
-        const file = new File([blob], `voice-${wp.id}.webm`, { type: "audio/webm" });
         uploadPromises.push(
-          uploadFile(file, id, wp.id).then((url) => {
+          (async () => {
+            try {
+              const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+              pendingContentUrls.set(wp.id, dataUrl);
+            } catch (e) {
+              console.error("Failed to convert voice blob to data URL", e);
+            }
+            const file = new File([blob], `voice-${wp.id}.webm`, { type: "audio/webm" });
+            const url = await uploadFile(file, id, wp.id);
             if (url) uploadedUrls.set(wp.id, url);
-          })
+          })()
         );
       } else if (wp.type === "image") {
+        pendingContentUrls.set(wp.id, pendingData as string);
         uploadPromises.push(
           (async () => {
             try {
@@ -392,15 +407,20 @@ export default function RecordWorkspace({ id }: RecordWorkspaceProps) {
     }
 
     await Promise.all(uploadPromises);
-    pendingMediaRef.current.clear();
 
     for (const m of savedMedia) {
       if (m.fileUrl?.startsWith("blob:")) URL.revokeObjectURL(m.fileUrl);
     }
 
     const finalMedia = savedMedia.map((m) =>
-      uploadedUrls.has(m.id) ? { ...m, fileUrl: uploadedUrls.get(m.id)! } : m
+      uploadedUrls.has(m.id)
+        ? { ...m, fileUrl: uploadedUrls.get(m.id)!, content: "" }
+        : pendingContentUrls.has(m.id)
+          ? { ...m, fileUrl: pendingContentUrls.get(m.id)!, content: pendingContentUrls.get(m.id)! }
+          : m
     );
+
+    pendingMediaRef.current.clear();
 
     const dateString = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
     const newTrace = {

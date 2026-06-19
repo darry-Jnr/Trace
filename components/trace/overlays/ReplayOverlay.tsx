@@ -161,12 +161,26 @@ export default function ReplayOverlay({
                 <p className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-1">
                   {labelMap[activeWaypoint.type] || "Moment"}
                 </p>
-                {activeWaypoint.type === "image" && activeWaypoint.fileUrl ? (
-                  <img src={activeWaypoint.fileUrl} alt="" className="w-full rounded-xl mt-1" />
+                {activeWaypoint.type === "image" ? (
+                  (() => {
+                    const imgSrc = activeWaypoint.fileUrl || (activeWaypoint.content.startsWith("data:image/") ? activeWaypoint.content : null);
+                    return imgSrc ? (
+                      <img src={imgSrc} alt="" className="w-full rounded-xl mt-1" />
+                    ) : (
+                      <p className="text-[13px] text-black/50 italic">Image unavailable</p>
+                    );
+                  })()
                 ) : activeWaypoint.type === "voice" ? (
-                  <div className="mt-1">
-                    <audio controls src={activeWaypoint.fileUrl} className="w-full h-9" />
-                  </div>
+                  (() => {
+                    const audioSrc = activeWaypoint.fileUrl || (activeWaypoint.content.startsWith("data:") ? activeWaypoint.content : null);
+                    return audioSrc ? (
+                      <div className="mt-1">
+                        <audio controls src={audioSrc} className="w-full h-9" />
+                      </div>
+                    ) : (
+                      <p className="text-[13px] text-black/50 italic">{activeWaypoint.content || "Voice note unavailable"}</p>
+                    );
+                  })()
                 ) : (
                   <p className="text-[14px] font-semibold text-black/85 leading-snug">
                     {activeWaypoint.content}
