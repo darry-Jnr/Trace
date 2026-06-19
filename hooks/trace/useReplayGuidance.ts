@@ -33,14 +33,12 @@ export function useReplayGuidance(
   const [activeWaypoint, setActiveWaypoint] = useState<WaypointMedia | null>(null);
   const [trailProgress, setTrailProgress] = useState(0);
   const [progressCoords, setProgressCoords] = useState<[number, number][]>([]);
-  const [syncPrompt, setSyncPrompt] = useState<"start" | "midpoint" | null>(null);
-  const [skipPercent, setSkipPercent] = useState(0);
+  const [syncPrompt, setSyncPrompt] = useState<"start" | null>(null);
 
   const syncedRef = useRef(false);
   const completedRef = useRef(false);
   const lastLocationRef = useRef<[number, number] | null>(null);
   const processingRef = useRef(false);
-  const midTrailCheckedRef = useRef(false);
   const promptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -68,33 +66,6 @@ export function useReplayGuidance(
     } else if (dist > 20 && syncPrompt === "start") {
       if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
       setSyncPrompt(null);
-    }
-
-    // Priority 2: Mid-trail detection — one-time on mount
-    if (!midTrailCheckedRef.current && !syncedRef.current && syncPrompt === null) {
-      let closest = 0;
-      let closestDist = Infinity;
-      for (let i = 0; i < trailCoordinates.length; i++) {
-        const d = getDistance(userLocation, trailCoordinates[i]);
-        if (d < closestDist) { closestDist = d; closest = i; }
-      }
-      if (closestDist <= 30 && dist > SYNC_THRESHOLD) {
-        setSyncPrompt("midpoint");
-        setSkipPercent(Math.round((closest / (trailCoordinates.length - 1)) * 100));
-      }
-      midTrailCheckedRef.current = true;
-    }
-
-    // Auto-dismiss midpoint prompt if user walks >30m from the trail
-    if (syncPrompt === "midpoint") {
-      let minDist = Infinity;
-      for (let i = 0; i < trailCoordinates.length; i++) {
-        const d = getDistance(userLocation, trailCoordinates[i]);
-        if (d < minDist) minDist = d;
-      }
-      if (minDist > 30) {
-        setSyncPrompt(null);
-      }
     }
 
     // Movement throttle — only gate guidance-following logic, not prompt detection
@@ -152,14 +123,12 @@ export function useReplayGuidance(
   const reset = useCallback(() => {
     syncedRef.current = false;
     completedRef.current = false;
-    midTrailCheckedRef.current = false;
     setGuidanceState("idle");
     setDistanceToStart(null);
     setActiveWaypoint(null);
     setTrailProgress(0);
     setProgressCoords([]);
     setSyncPrompt(null);
-    setSkipPercent(0);
   }, []);
 
   return {
@@ -169,7 +138,6 @@ export function useReplayGuidance(
     progressCoords,
     activeWaypoint,
     syncPrompt,
-    skipPercent,
     startGuidance,
     dismissSyncPrompt,
     dismissWaypoint,

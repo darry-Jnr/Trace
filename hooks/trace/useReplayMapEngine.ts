@@ -83,18 +83,26 @@ export function useReplayMapEngine(
           paint: { "line-color": "#000000", "line-width": 5.5, "line-opacity": 0.9 },
         });
 
-        const markerShape = "w-5 h-5 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
         const coords = trailCoordsRef.current;
         const startLoc = coords.length > 0 ? coords[0] : baseLocRef.current || [0, 0];
-        const startEl = document.createElement("div");
-        startEl.className = markerShape;
+
+        const createFlagElement = (color: string) => {
+          const el = document.createElement("div");
+          el.style.cssText = "width:20px;height:28px;position:relative;cursor:default;pointer-events:none;";
+          el.innerHTML = `
+            <div style="position:absolute;top:0;left:9px;width:2px;height:28px;background:#444;border-radius:1px;"></div>
+            <div style="position:absolute;top:2px;left:9px;width:12px;height:8px;background:${color};border-radius:0 2px 2px 0;box-shadow:0 1px 3px rgba(0,0,0,0.15);"></div>
+          `;
+          return el;
+        };
+
+        const startEl = createFlagElement("#0052FF");
         const startMarker = new mapboxglRef.current.Marker({ element: startEl }).setLngLat(startLoc).addTo(map);
         startMarkerRef.current = startMarker;
 
         const endLoc = coords.length > 0 ? coords[coords.length - 1] : null;
         if (endLoc) {
-          const endEl = document.createElement("div");
-          endEl.className = markerShape;
+          const endEl = createFlagElement("#0052FF");
           const endMarker = new mapboxglRef.current.Marker({ element: endEl }).setLngLat(endLoc).addTo(map);
           endMarkerRef.current = endMarker;
         }
@@ -296,14 +304,14 @@ export function useReplayMapEngine(
 
   // Update start/end marker colors based on guidance progress
   useEffect(() => {
-    const activeClass = "w-5 h-5 rounded-sm bg-black border-[3px] border-white shadow-[0_0_16px_rgba(0,0,0,0.6)] pointer-events-none";
-    const inactiveClass = "w-5 h-5 rounded-sm bg-[#0052FF] border-[3px] border-white shadow-[0_0_16px_rgba(0,82,255,0.6)] pointer-events-none";
-    if (startMarkerRef.current) {
-      startMarkerRef.current.getElement().className = isFollowing || isCompleted ? activeClass : inactiveClass;
-    }
-    if (endMarkerRef.current) {
-      endMarkerRef.current.getElement().className = isCompleted ? activeClass : inactiveClass;
-    }
+    const setFlagColor = (marker: mapboxgl.Marker | null, active: boolean) => {
+      if (!marker) return;
+      const el = marker.getElement();
+      const flag = el.querySelector("div:last-child") as HTMLElement | null;
+      if (flag) flag.style.background = active ? "#000" : "#0052FF";
+    };
+    setFlagColor(startMarkerRef.current, isFollowing || isCompleted);
+    setFlagColor(endMarkerRef.current, isCompleted);
   }, [isFollowing, isCompleted]);
 
   const handleLocationStream = (coords: [number, number], heading: number | null) => {

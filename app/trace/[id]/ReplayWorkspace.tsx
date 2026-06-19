@@ -116,7 +116,6 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
     trailProgress,
     progressCoords,
     syncPrompt,
-    skipPercent,
     startGuidance,
     dismissSyncPrompt,
     dismissWaypoint,
@@ -193,7 +192,6 @@ export default function ReplayWorkspace({ id, initialData }: ReplayWorkspaceProp
           trailProgress={trailProgress}
           activeWaypoint={replayActiveWaypoint}
           syncPrompt={syncPrompt}
-          skipPercent={skipPercent}
           onStartGuidance={startGuidance}
           onDismissSyncPrompt={dismissSyncPrompt}
           onDismissWaypoint={handleDismissWaypoint}
