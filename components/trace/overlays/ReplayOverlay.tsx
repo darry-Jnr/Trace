@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { WaypointMedia } from "@/types";
-import { MapPin, Volume2, Camera, FileText, CheckCircle, X, RotateCcw } from "lucide-react";
+import { MapPin, Volume2, Camera, FileText, CheckCircle, X, RotateCcw, Pin } from "lucide-react";
 
 interface ReplayOverlayProps {
   guidanceState: "idle" | "synced" | "following" | "complete";

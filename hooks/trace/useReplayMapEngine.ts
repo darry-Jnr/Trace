@@ -24,6 +24,7 @@ export function useReplayMapEngine(
   const injectedMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
   const [mapError, setMapError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const mapboxglRef = useRef<any>(null);
   const userCoordsRef = useRef<[number, number] | null>(null);
   const accuracyRef = useRef(gpsAccuracy);
@@ -202,6 +203,7 @@ export function useReplayMapEngine(
 
           // Add replay visuals
           addReplayVisuals();
+          setMapReady(true);
         });
 
         // User marker — starts black in replay (viewer)
@@ -421,6 +423,8 @@ export function useReplayMapEngine(
 
   // Sync grouped waypoint markers to Mapbox map
   useEffect(() => {
+    if (!mapReady) return;
+
     const map = mapInstanceRef.current;
     if (!map) return;
 
@@ -461,7 +465,7 @@ export function useReplayMapEngine(
     } else {
       map.once("style.load", applyWaypointGroups);
     }
-  }, [savedMedia]);
+  }, [savedMedia, mapReady]);
 
   const centerOnCoords = (coords: [number, number]) => {
     const map = mapInstanceRef.current;
